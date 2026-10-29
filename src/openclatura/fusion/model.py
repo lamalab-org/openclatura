@@ -294,6 +294,17 @@ class FusionComponentSpec:
     # adjacency, so an immutable spec retains it on the same terms as the sides
     # above; dataclass replacement resets it with them.
     _bond_locant_sets: frozenset | None = field(default=None, init=False, compare=False, repr=False)
+    # Canonical interface orbits derive only from the immutable retained
+    # template.  Candidate searches ask for the same handful of paths many
+    # thousands of times, so retain those derived values with the spec rather
+    # than recomputing graph automorphisms for every candidate.
+    _interface_orbits: dict[tuple[str, ...], tuple[str, ...]] | None = field(
+        default=None,
+        init=False,
+        compare=False,
+        repr=False,
+        hash=False,
+    )
 
     def __post_init__(self) -> None:
         for value, label in (

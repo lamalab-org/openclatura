@@ -825,7 +825,7 @@ def _candidates_for_root_sets(
     for topology in topologies:
         if any(not specs[occurrence].usable_as_attached for occurrence in topology.parent_by_child):
             continue
-        if len(topology.roots) == 1 and not (topology.interparent_pairs or topology.cycle_closing_pairs):
+        if len(topology.roots) == 1:
             candidate = _best_tree_mapping_candidate(
                 mapping_sets,
                 specs,
@@ -840,6 +840,11 @@ def _candidates_for_root_sets(
             if candidate is not None:
                 candidates.append(candidate)
             continue
+        best_assignment = None
+        best_score = None
+        normalized_join_cache: dict[tuple[int, int, int], FusionJoin] = {}
+        closing_validity_cache: dict[tuple[frozenset[int], int, int], bool] = {}
+        attachment_key_cache: dict[tuple[int, int, int], tuple] = {}
         for selected_maps, selected_joins in _compatible_mapping_assignments(
             mapping_sets,
             specs,
@@ -849,6 +854,24 @@ def _candidates_for_root_sets(
             interface_by_pair,
             mol,
         ):
+            score = _mapping_candidate_score(
+                selected_maps,
+                specs,
+                topology,
+                interface_by_pair,
+                mol,
+                supported_joins,
+                enforce_interoperability_limits,
+                selected_joins,
+                normalized_join_cache,
+                closing_validity_cache,
+                attachment_key_cache,
+            )
+            if score is not None and (best_score is None or score < best_score):
+                best_score = score
+                best_assignment = (selected_maps, selected_joins)
+        if best_assignment is not None:
+            selected_maps, selected_joins = best_assignment
             candidate = _build_candidate(
                 selected_maps,
                 specs,
@@ -861,8 +884,9 @@ def _candidates_for_root_sets(
                 enforce_interoperability_limits,
                 classified_primary=selected_joins,
             )
-            if candidate is not None:
-                candidates.append(candidate)
+            if candidate is None or candidate.score != best_score:
+                raise FusionDescriptorError("fusion mapping preference evaluation disagrees with candidate build")
+            candidates.append(candidate)
     return candidates
 
 
@@ -935,6 +959,20 @@ def _best_tree_mapping_candidate(
     selected_joins: dict[int, FusionJoin] = {}
     side_ranks: dict[int, int] = {}
     best: _Candidate | None = None
+    classified_join_cache: dict[tuple[int, int, int, int], tuple[FusionJoin, int] | None] = {}
+    attached_key_cache: dict[int, tuple] = {}
+
+    def attached_key(join: FusionJoin) -> tuple:
+        key = id(join.interface)
+        cached = attached_key_cache.get(key)
+        if cached is None:
+            cached = _attached_locant_key(join)
+            attached_key_cache[key] = cached
+        return cached
+
+    def join_preference_key(child: int) -> tuple:
+        join = selected_joins[child]
+        return (join.order, side_ranks[child], attached_key(join))
 
     def prefix_is_worse(prefix: tuple[tuple, ...]) -> bool:
         if best is None:
@@ -955,7 +993,18 @@ def _best_tree_mapping_candidate(
             enforce_interoperability_limits,
             classified_primary={child: (join, side_ranks[child]) for child, join in selected_joins.items()},
         )
-        if candidate is not None and (best is None or candidate.score < best.score):
+        if candidate is None:
+            return
+        if best is None or candidate.score < best.score:
+            best = candidate
+            return
+        if candidate.score == best.score and render_fusion_name(candidate.build_ast(), registry) < render_fusion_name(
+            best.build_ast(), registry
+        ):
+            # The rendered citation is the final deterministic tiebreaker.
+            # Closing joins are absent from the structural preference key, so
+            # cyclic covers can reach this tie even when their rendered
+            # higher-order descriptors differ.
             best = candidate
 
     def visit_ordered_children(
@@ -970,7 +1019,7 @@ def _best_tree_mapping_candidate(
         child = ordered[index]
 
         def after_child(child_prefix: tuple[tuple, ...]) -> None:
-            next_prefix = child_prefix + (_join_preference_key(selected_joins[child], side_ranks[child]),)
+            next_prefix = child_prefix + (join_preference_key(child),)
             if not prefix_is_worse(next_prefix):
                 visit_ordered_children(ordered, index + 1, next_prefix, continuation)
 
@@ -994,7 +1043,6 @@ def _best_tree_mapping_candidate(
         # per combination of the siblings before it. Each mapping is proved on
         # the first combination that reaches it and the result is reused for
         # the rest of this visit, which is scoped to one selected[node].
-        proved_joins: dict[int, dict[int, tuple[FusionJoin, int] | None]] = {}
         # Two of the four citation-order criteria ask only about a child's own
         # spec, which nothing in this search varies, so they are settled once
         # per visit rather than rebuilt for every element of every leaf sort.
@@ -1014,7 +1062,7 @@ def _best_tree_mapping_candidate(
                         key=lambda child: (
                             spec_order_keys[child][0],
                             side_ranks[child],
-                            _attached_locant_key(selected_joins[child]),
+                            attached_key(selected_joins[child]),
                             spec_order_keys[child][1],
                         ),
                     )
@@ -1024,11 +1072,10 @@ def _best_tree_mapping_candidate(
 
             child = child_ids[position]
             interface = interface_by_pair[frozenset((child, node))]
-            proved = proved_joins.setdefault(child, {})
-            for index, mapping in enumerate(projected[child]):
-                if index in proved:
-                    classified = proved[index]
-                else:
+            for mapping in projected[child]:
+                cache_key = (child, node, id(mapping), id(selected[node]))
+                classified = classified_join_cache.get(cache_key, _INTERFACE_NOT_CACHED)
+                if classified is _INTERFACE_NOT_CACHED:
                     classified = _classified_join(
                         mapping,
                         selected[node],
@@ -1039,7 +1086,7 @@ def _best_tree_mapping_candidate(
                         mol,
                         host_projection,
                     )
-                    proved[index] = classified
+                    classified_join_cache[cache_key] = classified
                 if classified is None:
                     continue
                 join, side_rank = classified
@@ -1338,6 +1385,119 @@ def _deduplicate_interface_equivalent_maps(
             by_projection.setdefault(projection, mapping)
         result.append(tuple(by_projection[key] for key in sorted(by_projection)))
     return tuple(result)
+
+
+def _mapping_candidate_score(
+    matches: Sequence[FusionComponentMatch],
+    specs: Mapping[int, FusionComponentSpec],
+    topology: _CitationTopology,
+    interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
+    mol: Molecule,
+    supported_joins: frozenset[str],
+    enforce_interoperability_limits: bool,
+    classified_primary: Mapping[int, tuple[FusionJoin, int]],
+    normalized_join_cache: dict[tuple[int, int, int], FusionJoin],
+    closing_validity_cache: dict[tuple[frozenset[int], int, int], bool],
+    attachment_key_cache: dict[tuple[int, int, int], tuple],
+) -> tuple | None:
+    """Evaluate one complete mapping without constructing its citation AST.
+
+    Cyclic covers can have a large Cartesian product of component-local
+    numberings.  Their preference is determined by primary joins and the
+    citation tree; closing joins only have to be valid.  Evaluate exactly those
+    structural facts for every assignment and let ``_build_candidate`` allocate
+    the full immutable citation objects only for the preferred assignment.
+    """
+
+    match_by_id = {match.occurrence_id: match for match in matches}
+    if enforce_interoperability_limits and any(
+        len(match_by_id[occurrence].covered_face_ids) > _SUPPORT.maximum_multiparent_interparent_faces
+        for occurrence in topology.interparent_occurrences
+    ):
+        return None
+
+    primary_joins: dict[int, FusionJoin] = {}
+    side_rank: dict[int, int] = {}
+    for child in topology.parent_by_child:
+        join_data = classified_primary.get(child)
+        if join_data is None:
+            return None
+        join, side_rank[child] = join_data
+        order = topology.order_by_occurrence[child]
+        if order > 1:
+            if "higher_order" not in supported_joins:
+                return None
+            cache_key = (child, id(join.interface), order)
+            normalized = normalized_join_cache.get(cache_key)
+            if normalized is None:
+                normalized = replace(
+                    join,
+                    interface=replace(
+                        join.interface,
+                        kind=FusionJoinKind.HIGHER_ORDER,
+                        host_sides=(),
+                        host_locants=join.interface.host_path,
+                    ),
+                )
+                normalized_join_cache[cache_key] = normalized
+            join = normalized
+        primary_joins[child] = join
+
+    # Closing interfaces do not participate in the preference key, but every
+    # one must be expressible for the mapping to be a candidate.
+    for pair in (*topology.interparent_pairs, *topology.cycle_closing_pairs):
+        attached, host = _closing_join_direction(
+            pair,
+            topology.roots,
+            topology.order_by_occurrence,
+            specs,
+        )
+        cache_key = (pair, id(match_by_id[attached]), id(match_by_id[host]))
+        valid = closing_validity_cache.get(cache_key)
+        if valid is None:
+            valid = (
+                classify_ordered_fusion_interface(
+                    match_by_id[attached],
+                    match_by_id[host],
+                    specs[attached],
+                    specs[host],
+                    interface_by_pair[pair],
+                    mol,
+                )
+                is not None
+            )
+            closing_validity_cache[cache_key] = valid
+        if not valid:
+            return None
+
+    child_order = _ordered_children(topology.parent_by_child, specs, primary_joins, side_rank)
+    _prime_depths, groups = _multiplicative_groups(
+        child_order,
+        specs,
+        primary_joins,
+        attachment_key_cache=attachment_key_cache,
+    )
+    if len(topology.roots) > 1:
+        groups = ()
+    roots = tuple(_build_citation_tree(root, child_order) for root in topology.roots)
+    if enforce_interoperability_limits and len(roots) == 1 and not _tree_citation_scope_supported(roots[0], groups):
+        return None
+    citation_children = tuple(occurrence for root in roots for occurrence in _preorder_children(root))
+    exact_location_key = replace(
+        topology.location_key,
+        multiplicative_grouping_score=tuple(
+            -len(group.occurrence_ids)
+            for group in sorted(groups, key=lambda group: (-len(group.occurrence_ids), group.occurrence_ids))
+        ),
+    )
+    return (
+        component_spec_seniority_key(specs[topology.roots[0]]).as_tuple(),
+        exact_location_key,
+        len(matches),
+        max(topology.order_by_occurrence.values(), default=0),
+        tuple(_join_preference_key(primary_joins[child], side_rank[child]) for child in citation_children),
+        tuple(component_spec_seniority_key(specs[child]).as_tuple() for child in citation_children),
+    )
 
 
 def _build_candidate(
@@ -1773,6 +1933,8 @@ def _multiplicative_groups(
     child_order: Mapping[int, tuple[int, ...]],
     specs: Mapping[int, FusionComponentSpec],
     joins: Mapping[int, FusionJoin],
+    *,
+    attachment_key_cache: dict[tuple[int, int, int], tuple] | None = None,
 ) -> tuple[dict[int, int], tuple[FusionMultiplicityGroup, ...]]:
     prime_depths: dict[int, int] = defaultdict(int)
     groups: list[FusionMultiplicityGroup] = []
@@ -1781,7 +1943,12 @@ def _multiplicative_groups(
         for child in children:
             if child not in child_order:
                 join = joins[child]
-                pattern = multiplicative_attachment_key(specs[child], join)
+                cache_key = (child, id(join.interface), join.order)
+                pattern = None if attachment_key_cache is None else attachment_key_cache.get(cache_key)
+                if pattern is None:
+                    pattern = multiplicative_attachment_key(specs[child], join)
+                    if attachment_key_cache is not None:
+                        attachment_key_cache[cache_key] = pattern
                 by_pattern[pattern].append(child)
         for _pattern, members in sorted(by_pattern.items()):
             if len(members) < 2:
