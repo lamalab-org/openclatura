@@ -19,7 +19,7 @@ class ComponentHydrogenConsumption:
 def component_hydrogen_consumption(
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
-    completed_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
+    completed_carbon_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
 ) -> ComponentHydrogenConsumption | None:
     """Prove consumption without assuming the original H locant is retained.
 
@@ -39,14 +39,14 @@ def component_hydrogen_consumption(
         return None
     components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
     junctions = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
-    return _component_hydrogen_consumption(components, junctions, completed_indicated_hydrogen_atoms)
+    return _component_hydrogen_consumption(components, junctions, completed_carbon_indicated_hydrogen_atoms)
 
 
 @lru_cache(maxsize=512)
 def _component_hydrogen_consumption(
     components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...],
     junctions: frozenset[int],
-    completed_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
+    completed_carbon_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
 ) -> ComponentHydrogenConsumption | None:
     from .indicated_hydrogen import (
         _component_graph,
@@ -72,6 +72,7 @@ def _component_hydrogen_consumption(
     if not model.allowed_kekule_assignments:
         return None
     pi_atoms = {atom for edge in model.pi_eligible_edges | model.required_double_bonds for atom in edge}
+    carbon_pi_atoms = pi_atoms & {atom.id for atom in graph.atoms if atom.symbol == "C"}
     local_domains = []
     defaults = set()
     for match, spec in components:
@@ -111,7 +112,12 @@ def _component_hydrogen_consumption(
     for assignment in model.allowed_kekule_assignments:
         doubles = frozenset(edge for edge, order in assignment.orders if order == 2)
         paired = {atom for edge in doubles for atom in edge}
-        if pi_atoms - paired != pi_atoms & completed_indicated_hydrogen_atoms:
+        residual_carbon = carbon_pi_atoms - paired
+        # A fully paired composition consumes the component-local carbon H
+        # independently of other hydrogens cited by the completed parent.  If
+        # carbon remains unpaired, every such site must instead be represented
+        # by a completed-system indicated-H citation.
+        if residual_carbon and residual_carbon != carbon_pi_atoms & completed_carbon_indicated_hydrogen_atoms:
             continue
         assignment_consumed = set()
         for occurrence, edges, assignments, local_pi, carbon_h in local_domains:

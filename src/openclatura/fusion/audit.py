@@ -112,6 +112,7 @@ class _DisjointSet:
 
 
 def _unrepresented_component_indicated_hydrogens(
+    mol: Molecule,
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
     indicated_hydrogens: tuple[SystemLocant, ...],
@@ -131,8 +132,10 @@ def _unrepresented_component_indicated_hydrogens(
     fusion_atoms = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
     completed_locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
     cited = {str(locant) for locant in indicated_hydrogens}
-    cited_atoms = frozenset(atom for atom, locant in completed_locants.items() if locant in cited)
-    consumption = component_hydrogen_consumption(ast, specs, cited_atoms)
+    cited_carbon_atoms = frozenset(
+        atom for atom, locant in completed_locants.items() if locant in cited and mol.atoms[atom].symbol == "C"
+    )
+    consumption = component_hydrogen_consumption(ast, specs, cited_carbon_atoms)
     consumed_defaults = consumption.default_sites if consumption is not None else frozenset()
     converted = (
         {atom for operation in derivative_state.intrinsic_hydro_operations for atom in operation.atom_ids}
@@ -207,6 +210,7 @@ def audit_fusion_plan(
             )
 
         unresolved_component_h = _unrepresented_component_indicated_hydrogens(
+            mol,
             ast,
             specs,
             indicated_hydrogens,
