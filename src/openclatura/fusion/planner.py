@@ -31,6 +31,7 @@ from .indicated_hydrogen import (
 )
 from .layout import (
     LayoutSearchBudgetExceeded,
+    OpsinConstructionLayout,
     can_use_component_entry_layout,
     component_entry_layouts,
     opsin_construction_atom_order,
@@ -214,6 +215,50 @@ def _plan_uncached(
     return FusionUnsupported("no supported audited fusion-component decomposition")
 
 
+def _has_multiplied_nonhexagonal_host(
+    ast: FusionNameAst,
+    face_model: FaceModel,
+    registry: FusionComponentRegistry,
+) -> bool:
+    """Identify multiplied-prefix constructions not modeled reliably by OPSIN.
+
+    OPSIN incorporates copies of a multiplied component sequentially. On a
+    nonhexagonal host, three or more implicit carbocyclic copies, or copies at
+    third and higher fusion order, can change the host perceived after an
+    earlier fusion. The citation remains chemically valid, but it is not an
+    interoperability witness for the graph OPSIN will construct. This check
+    depends only on component topology, never on component names or rendered
+    text.
+    """
+
+    if not ast.multiplicative_groups:
+        return False
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    face_size = {face.id: face.size for face in face_model.faces}
+    for group in ast.multiplicative_groups:
+        members = set(group.occurrence_ids)
+        multiplied_specs = tuple(registry.spec_for_match(matches[member]) for member in members)
+        if not all(
+            len(spec.rings) == 1 and len(spec.atoms) == 6 and all(atom.symbol == "C" for atom in spec.atoms)
+            for spec in multiplied_specs
+        ):
+            continue
+        hosts = {join.host_occurrence for join in ast.joins if join.attached_occurrence in members}
+        if len(hosts) != 1:
+            return True
+        host = matches.get(next(iter(hosts)))
+        if host is None:
+            return True
+        if len(host.covered_face_ids) != 1:
+            continue
+        group_joins = tuple(join for join in ast.joins if join.attached_occurrence in members)
+        if face_size.get(next(iter(host.covered_face_ids))) != 6 and (
+            len(members) >= 3 or any(join.order >= 3 for join in group_joins)
+        ):
+            return True
+    return False
+
+
 def _plan_numbered_candidate(
     mol: Molecule,
     atoms: frozenset[int],
@@ -253,6 +298,22 @@ def _plan_numbered_candidate(
         return FusionUnsupported("component hydrogen assignment search budget exhausted", (str(exc),))
     except ValueError as exc:
         return FusionAuditFailed("component hydrogen constraints are inconsistent", (str(exc),))
+    if require_parser_compatible_numbering and _has_multiplied_nonhexagonal_host(ast, face_model, registry):
+        return FusionUnsupported(
+            "OPSIN construction of multiplied components on a nonhexagonal host is not uniquely proven"
+        )
+    if require_parser_compatible_numbering and not any(
+        isinstance(layout, OpsinConstructionLayout) for layout in layouts
+    ):
+        for join in ast.joins:
+            spec = specs[join.attached_occurrence]
+            if (
+                join.order >= 3
+                and len(spec.rings) == 1
+                and len(spec.atoms) == 6
+                and all(atom.symbol == "C" for atom in spec.atoms)
+            ):
+                return FusionUnsupported("third-order carbocyclic fusion requires a parser construction layout witness")
     numbering_selection = numbering_cache.get(prove_carbon_h) if numbering_cache is not None else None
     if numbering_selection is None:
         numbering_selection = completed_system_numbering_selection(
