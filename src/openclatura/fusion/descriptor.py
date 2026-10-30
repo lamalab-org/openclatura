@@ -840,7 +840,7 @@ def _candidates_for_root_sets(
             if candidate is not None:
                 candidates.append(candidate)
             continue
-        best_assignment = None
+        best_assignments = []
         best_score = None
         normalized_join_cache: dict[tuple[int, int, int], FusionJoin] = {}
         closing_validity_cache: dict[tuple[frozenset[int], int, int], bool] = {}
@@ -869,9 +869,12 @@ def _candidates_for_root_sets(
             )
             if score is not None and (best_score is None or score < best_score):
                 best_score = score
-                best_assignment = (selected_maps, selected_joins)
-        if best_assignment is not None:
-            selected_maps, selected_joins = best_assignment
+                best_assignments = [(selected_maps, selected_joins)]
+            elif score is not None and score == best_score:
+                best_assignments.append((selected_maps, selected_joins))
+        best_candidate = None
+        best_rendered = None
+        for selected_maps, selected_joins in best_assignments:
             candidate = _build_candidate(
                 selected_maps,
                 specs,
@@ -886,7 +889,12 @@ def _candidates_for_root_sets(
             )
             if candidate is None or candidate.score != best_score:
                 raise FusionDescriptorError("fusion mapping preference evaluation disagrees with candidate build")
-            candidates.append(candidate)
+            rendered = render_fusion_name(candidate.build_ast(), registry)
+            if best_rendered is None or rendered < best_rendered:
+                best_candidate = candidate
+                best_rendered = rendered
+        if best_candidate is not None:
+            candidates.append(best_candidate)
     return candidates
 
 
