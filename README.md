@@ -363,4 +363,4 @@ If you are using OPSIN for verification, please cite the original OPSIN publicat
 
 ## Funding :moneybag:
 
-This work was funded by the Carl-Zeiss Foundation, the Helmholtz Association within the framework of the Helmholtz Foundation Model Initiative (project SOL-AI), and the DFG (German Research Foundation).
+This work was funded by the Carl-Zeiss Foundation, the Helmholtz Association within the framework of the Helmholtz Foundation Model Initiative (project SOL-AI).
