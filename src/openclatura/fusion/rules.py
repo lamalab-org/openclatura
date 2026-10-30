@@ -112,6 +112,13 @@ def component_interface_orbit(
 
     from ..retained_fused_templates import retained_graph_template_automorphisms
 
+    cache = spec._interface_orbits
+    if cache is None:
+        cache = {}
+        object.__setattr__(spec, "_interface_orbits", cache)
+    cached = cache.get(directed_path)
+    if cached is not None:
+        return cached
     variants = []
     for automorphism in retained_graph_template_automorphisms(spec.template):
         image = dict(automorphism)
@@ -123,10 +130,12 @@ def component_interface_orbit(
         )
     if not variants:
         raise ValueError(f"component template {spec.key!r} has no graph automorphism")
-    return min(
+    result = min(
         variants,
         key=lambda path: tuple(retained_locant_sort_key(locant) for locant in path),
     )
+    cache[directed_path] = result
+    return result
 
 
 def multiplicative_attachment_key(

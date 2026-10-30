@@ -179,7 +179,7 @@ def test_planner_checks_next_descriptor_after_chemical_rejection(monkeypatch):
     first, second = object(), object()
     attempted = []
 
-    def candidates(*args):
+    def candidates(*args, **kwargs):
         yield first
         yield second
         pytest.fail("candidate generation must stop once a chemical plan is confirmed")
@@ -421,6 +421,22 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
         return result
 
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 8
+
+
+def test_descriptor_search_has_no_independent_component_count_limit():
+    components = ("furan",) * 25
+    joins = tuple(
+        pair
+        for occurrence in range(24)
+        for pair in (
+            ((occurrence, "4"), (occurrence + 1, "2")),
+            ((occurrence, "5"), (occurrence + 1, "3")),
+        )
+    )
+
+    _mol, ast, _name = _build(components, joins, enforce_interoperability_limits=False)
+
+    assert len(ast.component_occurrences) == 25
 
 
 def test_long_five_membered_ring_chain_respects_configured_component_budget(monkeypatch):

@@ -669,7 +669,7 @@ def _external_pi_parent_delta(
     except ValueError:
         return None
     parent_pi_atoms = {atom for edge in model.pi_eligible_edges | model.required_double_bonds for atom in edge}
-    candidates = []
+    assignment_groups: dict[frozenset[int], list[BondAssignment]] = {}
     # Direct consumption preserves intrinsic parent H; remaximized assignments
     # also permit suffix-induced pi redistribution. Exact comparison below
     # selects a witness before deriving the remaining hydro and added-H sites.
@@ -681,7 +681,7 @@ def _external_pi_parent_delta(
         assignments.update(constrained.allowed_kekule_assignments)
     for assignment in sorted(assignments, key=lambda value: value.orders):
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-        added = parent_pi_atoms - paired - forced
+        added = frozenset(parent_pi_atoms - paired - forced)
         if any(
             mol.atoms[atom].symbol not in {"C", "N"}
             or (mol.atoms[atom].symbol == "N" and not is_added_hydrogen_nitrogen(mol, atoms, atom))
@@ -693,13 +693,54 @@ def _external_pi_parent_delta(
             continue
         if any(mol.get_bond(atom, neighbor).order != 1 for atom in added for neighbor in mol.get_neighbors(atom)):
             continue
+        assignment_groups.setdefault(added, []).append(assignment)
+
+    # Several Kekule assignments commonly imply the same forced-single atom
+    # set. Build a matching-free comparison domain for each group, then rank
+    # its assignments by a cheap retained-state comparison. The rank is the
+    # exact rank used for the final witness, so expensive constrained matching
+    # is needed only while proving candidates lazily in preference order.
+    ranked = []
+    for added, grouped_assignments in assignment_groups.items():
+        forced_sites = forced | added
+        blocked_edges = frozenset(edge for edge in model.pi_eligible_edges if forced_sites.intersection(edge))
+        comparison_domain = replace(
+            model,
+            allowed_kekule_assignments=(),
+            required_single_bonds=model.required_single_bonds | blocked_edges,
+            pi_eligible_edges=model.pi_eligible_edges - blocked_edges,
+        )
+        ordered = tuple(sorted(added, key=lambda atom: system_locant_sort_key(str(locants[atom]))))
+        for assignment in grouped_assignments:
+            singleton = replace(comparison_domain, allowed_kekule_assignments=(assignment,))
+            delta = compare_actual_parent_to_implied_parent(
+                mol,
+                atoms,
+                singleton,
+                externally_unsaturated_atom_ids=external_pi_atoms,
+                atom_to_locant=locants,
+                preserve_retained_parent_state=True,
+            )
+            if delta is None or not delta.compatible:
+                continue
+            rank = (
+                # Keep established direct-consumption witnesses ahead of newly
+                # admitted shifts; their added-H ownership is already explicit.
+                bool(delta.additional_multiple_bond_ids),
+                len(delta.hydrogenated_edges),
+                # P-58.2.2.2: added-H locants precede hydro-prefix locants.
+                tuple(system_locant_sort_key(str(locants[atom])) for atom in ordered),
+                tuple(sorted(system_locant_sort_key(str(locants[site])) for site in delta.hydrogenated_atom_ids)),
+            )
+            ranked.append((rank, assignment.orders, assignment, added, ordered))
+
+    selected = None
+    selected_added_sites = frozenset()
+    for _, _, assignment, added, ordered in sorted(ranked):
         # Preserve the composed domain while proving any alternating shift.
         # Retained-state comparison prevents recursive external-pi composition;
         # the explicit flag still enables the exact redistribution proof.
-        # Added-H endpoints cannot acquire another pi bond while proving an
-        # alternating shift. Keep them constrained in the candidate domain,
-        # rather than applying that constraint only after witness selection.
-        candidate_model = _single_site_parent_model(model, forced | frozenset(added)) if added else constrained
+        candidate_model = _single_site_parent_model(model, forced | added) if added else constrained
         state = parent_derivative_state(
             mol,
             atoms,
@@ -710,8 +751,6 @@ def _external_pi_parent_delta(
         )
         if state is None or state.unsaturation_operations:
             continue
-        delta = state.bond_delta
-        ordered = tuple(sorted(added, key=lambda atom: system_locant_sort_key(str(locants[atom]))))
         operations = (
             (
                 HydroOperation(
@@ -735,25 +774,16 @@ def _external_pi_parent_delta(
             if ordered
             else ()
         )
-        rank = (
-            # Keep established direct-consumption witnesses ahead of newly
-            # admitted shifts; their added-H ownership is already explicit.
-            bool(delta.additional_multiple_bond_ids),
-            len(delta.hydrogenated_edges),
-            # P-58.2.2.2: added-H locants precede hydro-prefix locants.
-            tuple(system_locant_sort_key(str(locants[atom])) for atom in ordered),
-            tuple(sorted(system_locant_sort_key(str(locants[site])) for site in delta.hydrogenated_atom_ids)),
-        )
-        candidates.append((rank, replace(delta, added_hydrogen_operations=operations)))
-    if not candidates:
+        selected = replace(state.bond_delta, added_hydrogen_operations=operations)
+        selected_added_sites = frozenset(ordered)
+        break
+    if selected is None:
         return None
-    selected = min(candidates, key=lambda item: item[0])[1]
     if not selected.hydrogenated_edges:
         return selected
-    added_sites = frozenset(atom for operation in selected.added_hydrogen_operations for atom in operation.atom_ids)
     # Build this witness only for the winning candidate. Redistribution must
     # compare against the composed domain, not the unmodified parent hydride.
-    composition_model = _single_site_parent_model(model, forced | added_sites)
+    composition_model = _single_site_parent_model(model, forced | selected_added_sites)
     if selected.assignment not in composition_model.allowed_kekule_assignments:
         return selected
     return replace(selected, composition_model=composition_model)

@@ -249,12 +249,12 @@ class LayoutSearchBudgetExceeded(RuntimeError):
 
 @dataclass(slots=True)
 class _Budget:
-    limit: int
+    limit: int | None
     used: int = 0
 
     def spend(self) -> None:
         self.used += 1
-        if self.used > self.limit:
+        if self.limit is not None and self.used > self.limit:
             raise LayoutSearchBudgetExceeded(self.limit)
 
 
@@ -372,7 +372,7 @@ def _ordered_construction_layouts(
     ast: FusionNameAst,
     specs: dict[int, FusionComponentSpec],
     layouts: tuple[OpsinConstructionLayout, ...],
-    search_budget: int,
+    search_budget: int | None,
 ) -> tuple[OpsinConstructionLayout, ...]:
     from .construction_order import ordered_hexagonal_construction
 
@@ -424,7 +424,7 @@ def component_entry_layouts(
     ast: FusionNameAst,
     specs: dict[int, FusionComponentSpec],
     *,
-    search_budget: int = _CONFIG.search.layout_states,
+    search_budget: int | None = None,
 ) -> tuple[FusedLayout, ...] | None:
     """Bind construction-dependent numbering or directed entry to audited geometry.
 
@@ -437,7 +437,7 @@ def component_entry_layouts(
     use intrinsic layout search. An applicable but invalid witness is rejected,
     not replaced with unrestricted peripheral numbering.
     """
-    if search_budget < 1:
+    if search_budget is not None and search_budget < 1:
         raise ValueError("layout search budget must be positive")
     atoms = {atom for face in model.faces for atom in face.atom_cycle}
     ring_map_compatibility = _opsin_ring_map_tree(model)
@@ -597,8 +597,8 @@ def component_entry_layouts(
 def intrinsic_fused_layouts(
     model: FaceModel,
     *,
-    search_budget: int = _CONFIG.search.layout_states,
-    max_layouts: int = _CONFIG.search.maximum_layouts,
+    search_budget: int | None = None,
+    max_layouts: int | None = None,
     opsin_ring_map: bool = False,
 ) -> tuple[FusedLayout, ...]:
     """Enumerate audited intrinsic layouts in nomenclatural preference order.
@@ -607,7 +607,7 @@ def intrinsic_fused_layouts(
     inconsistent with the standard shapes and bounded large-ring reductions.
     """
 
-    if search_budget < 1 or max_layouts < 1:
+    if (search_budget is not None and search_budget < 1) or (max_layouts is not None and max_layouts < 1):
         raise ValueError("layout search budget and result limit must be positive")
     if opsin_ring_map and not _opsin_ring_map_tree(model):
         return ()
@@ -673,7 +673,7 @@ def intrinsic_fused_layouts(
 
 
 def _terminal_ring_proxy_layouts(
-    model: FaceModel, *, search_budget: int, max_layouts: int
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None
 ) -> tuple[FusedLayout, ...] | None:
     """Subdivide a standard terminal hexagon without changing its fusion axis.
 
@@ -732,7 +732,7 @@ def _terminal_ring_proxy_layouts(
 
 
 def _two_port_large_ring_layouts(
-    model: FaceModel, *, search_budget: int, max_layouts: int, face_id: int | None = None
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None, face_id: int | None = None
 ) -> tuple[FusedLayout, ...]:
     """Expand a hexagon direction witness into one two-port ring.
 
@@ -904,7 +904,7 @@ def _expand_proxy_layouts(
 
 
 def _ordinary_large_bicycle_layouts(
-    model: FaceModel, *, search_budget: int, max_layouts: int
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None
 ) -> tuple[FusedLayout, ...]:
     """Embed one edge-fused pair, without extending the general shape search.
 
@@ -978,7 +978,7 @@ def _ordinary_large_bicycle_layouts(
                     ),
                 )
             )
-            if len(layouts) > max_layouts:
+            if max_layouts is not None and len(layouts) > max_layouts:
                 raise LayoutSearchBudgetExceeded(max_layouts, resource="layouts")
     return tuple(sorted(layouts, key=_layout_sort_key))
 
@@ -986,8 +986,8 @@ def _ordinary_large_bicycle_layouts(
 def preferred_intrinsic_layout(
     model: FaceModel,
     *,
-    search_budget: int = _CONFIG.search.layout_states,
-    max_layouts: int = _CONFIG.search.maximum_layouts,
+    search_budget: int | None = None,
+    max_layouts: int | None = None,
 ) -> FusedLayout | None:
     """Return the preferred audited layout, or ``None`` to abstain."""
 
@@ -1002,8 +1002,8 @@ def preferred_intrinsic_layout(
 def preferred_intrinsic_layouts(
     model: FaceModel,
     *,
-    search_budget: int = _CONFIG.search.layout_states,
-    max_layouts: int = _CONFIG.search.maximum_layouts,
+    search_budget: int | None = None,
+    max_layouts: int | None = None,
     opsin_ring_map: bool = False,
 ) -> tuple[FusedLayout, ...]:
     """Return every layout tied on the intrinsic orientation criteria.
@@ -1018,7 +1018,7 @@ def preferred_intrinsic_layouts(
 
 @lru_cache(maxsize=128)
 def _preferred_intrinsic_layouts(
-    model: FaceModel, search_budget: int, max_layouts: int, opsin_ring_map: bool
+    model: FaceModel, search_budget: int | None, max_layouts: int | None, opsin_ring_map: bool
 ) -> tuple[FusedLayout, ...]:
     """Normalize implicit/explicit defaults before caching immutable layouts."""
 
@@ -1043,7 +1043,7 @@ def _search_layouts(
     budget: _Budget,
     completed: dict[tuple, FusedLayout],
     materialized_embeddings: set[tuple],
-    max_layouts: int,
+    max_layouts: int | None,
     coordinate_system: str,
     best_distortion: list[int | None],
     *,
@@ -1076,7 +1076,7 @@ def _search_layouts(
                 opsin_ring_map=opsin_ring_map,
             ):
                 completed.setdefault(_layout_geometry_key(layout), layout)
-            if len(completed) > max_layouts:
+            if max_layouts is not None and len(completed) > max_layouts:
                 raise LayoutSearchBudgetExceeded(max_layouts, resource="completed layouts")
         return
 
