@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-11-02
+
+### Added
+
+- Added configurable naming-style presets and spelling options while retaining
+  the deterministic default naming policy.
+- Added graph-backed parent treatment for onium cations, including indicated
+  hydrogen placement and stereochemical citation for aminium and ammonio
+  centers.
+- Added legacy fused-system interior numbering and plain HTTP endpoints for web
+  agents to retrieve generated names and human-readable descriptions.
+- Added automated annotated release tags after successful trusted PyPI
+  publication of a merged version change.
+
+### Changed
+
+- Reworked systematic-fusion candidate generation around lazy, exact-graph
+  pruning and removed fixed search caps that could exclude valid larger fused
+  systems.
+- Improved ring perception and canonical-rank refinement to run in linear work
+  per molecule, and pruned invalid fusion-parent tiers before expensive proof
+  construction.
+- Pinned the optional OPSIN compatibility dependency used by verification and
+  release testing.
+
+### Fixed
+
+- Corrected fused-parent numbering, parser-incompatible citations, relocated
+  parent hydrogen, and symmetry-equivalent rendered mapping ties.
+- Preserved complete acyl and chalcogen topology across anhydrides and ordered
+  citations, including parent-bearing acyl ends.
+- Corrected component ordering, cyanato attachment valence, azine and hydrazone
+  stereochemistry, exchangeable-hydrogen stereochemistry, and unnamed branch
+  handling.
+- Added germyl, stannyl, and plumbyl substituent prefixes and retained neutral
+  functional groups as prefixes when a cationic ring is selected as parent.
+
 ## [0.4.2] - 2026-10-08
 
 ### Added
@@ -298,7 +335,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.4...HEAD
+[0.4.4]: https://github.com/lamalab-org/openclatura/compare/v0.4.2...v0.4.4
 [0.4.2]: https://github.com/lamalab-org/openclatura/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...v0.4.0

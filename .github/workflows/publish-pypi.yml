@@ -120,3 +120,37 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  tag_release:
+    name: Create release tag
+    needs: [release_metadata, publish]
+    if: needs.release_metadata.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out published revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push annotated version tag
+        env:
+          RELEASE_VERSION: ${{ needs.release_metadata.outputs.package_version }}
+        run: |
+          tag="v${RELEASE_VERSION}"
+          if git show-ref --verify --quiet "refs/tags/${tag}"; then
+            tagged_commit="$(git rev-list -n 1 "${tag}")"
+            if [ "${tagged_commit}" = "${GITHUB_SHA}" ]; then
+              echo "${tag} already points to ${GITHUB_SHA}; nothing to do"
+              exit 0
+            fi
+            echo "Refusing to move existing tag ${tag} from ${tagged_commit} to ${GITHUB_SHA}" >&2
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "${tag}" --message "Release ${tag}" "${GITHUB_SHA}"
+          git push origin "refs/tags/${tag}"
