@@ -24,6 +24,7 @@ from pathlib import Path
 from . import __version__, name_many
 from . import describe as describe_one
 from . import name as name_one
+from .naming_style import PRESETS, NamingStyle, resolve_style
 
 
 def _iter_smiles(path: str) -> Iterator[str]:
@@ -37,6 +38,27 @@ def _iter_smiles(path: str) -> Iterator[str]:
             yield line
 
 
+def _style_from_args(args: argparse.Namespace) -> NamingStyle:
+    return resolve_style(
+        args.style,
+        enclosing_marks=args.enclosing_marks,
+        thiol_prefix=args.thiol_prefix,
+        locant_placement=args.locant_placement,
+        heterocycle_names=args.heterocycle_names,
+    )
+
+
+def _add_style_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_argument_group("name style")
+    group.add_argument("--style", choices=list(PRESETS), default="default", help="spelling preset")
+    group.add_argument(
+        "--enclosing-marks", choices=["parentheses", "nested", "alternating"], help="override the preset"
+    )
+    group.add_argument("--thiol-prefix", choices=["sulfanyl", "mercapto"], help="override the preset")
+    group.add_argument("--locant-placement", choices=["before_suffix", "before_parent"], help="override the preset")
+    group.add_argument("--heterocycle-names", choices=["retained", "hantzsch_widman"], help="override the preset")
+
+
 def _cmd_name(args: argparse.Namespace) -> int:
     result = name_one(
         args.smiles,
@@ -44,6 +66,7 @@ def _cmd_name(args: argparse.Namespace) -> int:
         verify_opsin=args.verify,
         verify_self=args.self_audit,
         token_debug=args.token_debug,
+        style=_style_from_args(args),
     )
     if args.json:
         json.dump(result.to_dict(include_trace=True), sys.stdout, indent=2, default=str)
@@ -74,6 +97,7 @@ def _cmd_batch(args: argparse.Namespace) -> int:
         token_debug=args.token_debug,
         processes=processes,
         chunksize=args.chunksize,
+        style=_style_from_args(args),
     )
     out = sys.stdout if args.output == "-" else open(args.output, "w", encoding="utf-8")  # noqa: SIM115
     try:
@@ -127,6 +151,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="OPSIN-free reconstruction self-audit (no Java needed)",
     )
+    _add_style_arguments(p_name)
     p_name.set_defaults(func=_cmd_name)
 
     p_batch = sub.add_parser("batch", help="Name a file of SMILES (JSONL output)")
@@ -164,6 +189,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="exit 0 even if some rows produced an error",
     )
+    _add_style_arguments(p_batch)
     p_batch.set_defaults(func=_cmd_batch)
 
     p_describe = sub.add_parser(

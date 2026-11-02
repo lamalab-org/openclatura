@@ -8,6 +8,7 @@ from enum import StrEnum
 from functools import lru_cache
 
 from .naming_data import grouped_namer_rules
+from .naming_style import styled_thiol_prefix
 
 
 @dataclass(frozen=True)
@@ -258,7 +259,9 @@ class FunctionalGroupRules:
 
     def prefix_for(self, key: str) -> str | None:
         rule = self.by_key.get(key)
-        return rule.prefix if rule else None
+        if rule is None:
+            return None
+        return styled_thiol_prefix(rule.prefix) if rule.prefix else rule.prefix
 
     def cited_prefix_for(self, key: str) -> str | None:
         prefix = self.prefix_for(key)

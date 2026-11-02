@@ -2,6 +2,11 @@
   "schema_version": 1,
   "registry_version": "2026.1",
   "graph_source": "retained_graph_templates",
+  "numbering": {
+    "interior_carbon_profile": "legacy_cas_letter_continuation",
+    "rule_reference": "FR-5.5.2",
+    "opsin_compatibility_version": "2.9.0"
+  },
   "rules": {
     "planner_tier": "bounded-polycomponent-v3",
     "support": {
@@ -10,6 +15,7 @@
       "multiparent_parents": true,
       "maximum_tree_component_occurrences": 16,
       "maximum_multiparent_component_occurrences": 3,
+      "maximum_multiparent_interparent_faces": 1,
       "charged_parents": true,
       "nonstandard_valence": true,
       "interior_atoms": true,
@@ -22,18 +28,7 @@
   },
   "search_limits": {
     "minimum_ring_size": 3,
-    "maximum_ring_size": 8,
-    "maximum_faces": 24,
-    "cycle_states": 100000,
-    "face_model_states": 50000,
-    "layout_states": 25000,
-    "maximum_layouts": 4096,
-    "maximum_component_occurrences": 16,
-    "maximum_component_selections": 256,
-    "component_selection_states": 4096,
-    "locant_map_combinations": 4096,
-    "mancude_states": 100000,
-    "maximum_name_candidates": 64
+    "maximum_ring_size": 8
   },
   "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [

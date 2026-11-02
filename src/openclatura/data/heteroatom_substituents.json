@@ -82,6 +82,30 @@
         "0": "silyl"
       }
     },
+    "Ge": {
+      "unsubstituted_prefixes": {
+        "0": "germyl"
+      },
+      "ligand_prefixes": {
+        "0": "germyl"
+      }
+    },
+    "Sn": {
+      "unsubstituted_prefixes": {
+        "0": "stannyl"
+      },
+      "ligand_prefixes": {
+        "0": "stannyl"
+      }
+    },
+    "Pb": {
+      "unsubstituted_prefixes": {
+        "0": "plumbyl"
+      },
+      "ligand_prefixes": {
+        "0": "plumbyl"
+      }
+    },
     "As": {
       "unsubstituted_prefixes": {
         "0": "arsanyl",

@@ -29,6 +29,8 @@ from .namer import (
     name_smiles_with_trace,
 )
 from .naming_context import NamingIntent
+from .naming_style import PRESETS as STYLE_PRESETS
+from .naming_style import NamingStyle, resolve_style
 from .nomenclature import RULES, registry
 from .opsin_verify import OpsinCheck, OpsinStatus, opsin_available, verify_with_opsin
 
@@ -42,6 +44,11 @@ def name(
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
     fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    style: NamingStyle | str | None = None,
+    enclosing_marks: str | None = None,
+    thiol_prefix: str | None = None,
+    locant_placement: str | None = None,
+    heterocycle_names: str | None = None,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
 
@@ -53,6 +60,11 @@ def name(
     (see ``result.self_audit`` / ``result.self_verified``). Systematic fusion
     naming defaults to the audited PIN policy; pass an explicit ``FusionMode``
     to select general fusion nomenclature or legacy behavior.
+
+    ``style`` picks a spelling preset (``"default"``, ``"iupac2013"``,
+    ``"traditional"``; see ``STYLE_PRESETS``) or a ``NamingStyle``;
+    ``enclosing_marks``, ``thiol_prefix``, ``locant_placement`` and
+    ``heterocycle_names`` override single options of it.
     """
 
     return DEFAULT_NAMING_ENGINE.run(
@@ -64,6 +76,13 @@ def name(
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
             fusion_mode=FusionMode(fusion_mode),
+            style=resolve_style(
+                style,
+                enclosing_marks=enclosing_marks,
+                thiol_prefix=thiol_prefix,
+                locant_placement=locant_placement,
+                heterocycle_names=heterocycle_names,
+            ),
         )
     )
 
@@ -77,6 +96,11 @@ def name_mol(
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
     fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    style: NamingStyle | str | None = None,
+    enclosing_marks: str | None = None,
+    thiol_prefix: str | None = None,
+    locant_placement: str | None = None,
+    heterocycle_names: str | None = None,
 ) -> NamingResult:
     """One-shot naming of an existing RDKit molecule. Returns a ``NamingResult``.
 
@@ -95,6 +119,13 @@ def name_mol(
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
             fusion_mode=FusionMode(fusion_mode),
+            style=resolve_style(
+                style,
+                enclosing_marks=enclosing_marks,
+                thiol_prefix=thiol_prefix,
+                locant_placement=locant_placement,
+                heterocycle_names=heterocycle_names,
+            ),
         )
     )
 
@@ -110,6 +141,11 @@ def name_many(
     fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     processes: int | None | str = 1,
     chunksize: int = 64,
+    style: NamingStyle | str | None = None,
+    enclosing_marks: str | None = None,
+    thiol_prefix: str | None = None,
+    locant_placement: str | None = None,
+    heterocycle_names: str | None = None,
 ) -> list[NamingResult]:
     """Batch convenience wrapper around :meth:`NamingEngine.name_many`.
 
@@ -129,6 +165,13 @@ def name_many(
         fusion_mode=FusionMode(fusion_mode),
         processes=processes,
         chunksize=chunksize,
+        style=resolve_style(
+            style,
+            enclosing_marks=enclosing_marks,
+            thiol_prefix=thiol_prefix,
+            locant_placement=locant_placement,
+            heterocycle_names=heterocycle_names,
+        ),
     )
 
 
@@ -147,11 +190,13 @@ __all__ = [
     "NamingIntent",
     "NamingRequest",
     "NamingResult",
+    "NamingStyle",
     "NomenclatureOperation",
     "OperationClass",
     "OpsinCheck",
     "OpsinStatus",
     "RULES",
+    "STYLE_PRESETS",
     "TracePhase",
     "TraceStep",
     "__version__",
@@ -169,5 +214,6 @@ __all__ = [
     "opsin_available",
     "register_group_detector",
     "registry",
+    "resolve_style",
     "verify_with_opsin",
 ]

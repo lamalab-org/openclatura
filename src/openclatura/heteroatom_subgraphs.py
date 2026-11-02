@@ -28,10 +28,15 @@ from .namer_config import (
     SIMPLE_SULFANYL_PREFIXES,
 )
 from .naming_protocols import RecursiveSubgraphNamer
+from .naming_style import styled_thiol_prefix
 from .nitrogen_roles import terminal_n3_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import elision, multipliers
+
+
+class _UnnamedBranch(Exception):
+    """A ligand branch of the heteroatom has no name, so the heteroatom substituent has none either."""
 
 
 def _branch_name_text(
@@ -50,6 +55,11 @@ def _branch_name_text(
         upstream_atom=upstream_atom,
     )
     name, _ = split_rendered_substituent_name(rendered)
+    # The renderers below read an empty name as "no ligand here" (``hydroxy``
+    # for an ``oxy`` with nothing to name), which would drop the branch's atoms.
+    # An explicit hydrogen (deuterium, say) is the one ligand that has no name.
+    if not name and mol.atoms[start_idx].symbol != "H":
+        raise _UnnamedBranch
     return name
 
 
@@ -272,7 +282,11 @@ def name_carbonyl_like_fragment(
 
 
 def format_amino_from_branches(
-    branches: list[str], is_double: bool, is_cation: bool = False, is_anion: bool = False
+    branches: list[str],
+    is_double: bool,
+    is_cation: bool = False,
+    is_anion: bool = False,
+    stereo_prefix_text: str = "",
 ) -> str:
     if is_double:
         if is_cation:
@@ -296,7 +310,7 @@ def format_amino_from_branches(
     if is_cation:
         prefix = charged_heteroatom_prefix("N", 1, "single") or "ammonio"
         if prefix == "ammonio":
-            return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches])
+            return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches], stereo_prefix_text)
         return prefix
     if is_anion:
         if not branches:
@@ -570,7 +584,10 @@ def name_nitrogen_subgraph(
                 if branch:
                     branches.append(branch)
 
-    return format_amino_from_branches(branches, is_double, is_cation, is_anion)
+    # A quaternary ammonio nitrogen cites its R/S inside the prefix, as a sulfaniumyl does.
+    nitrogen = mol.atoms[start_idx]
+    stereo_prefix_text = stereo_prefix(nitrogen) if is_cation and nitrogen.total_h_count == 0 else ""
+    return format_amino_from_branches(branches, is_double, is_cation, is_anion, stereo_prefix_text)
 
 
 def terminal_n3_prefix(
@@ -823,7 +840,7 @@ def name_sulfur_subgraph(
             return "thioxo"
         if mol.atoms[start_idx].charge == -1:
             return charged_heteroatom_prefix("S", -1, "single") or "sulfido"
-        return f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
+        return f"{stereo_prefix_text}{styled_thiol_prefix(unsubstituted_prefix('S') or 'sulfanyl')}"
 
     if len(next_atoms) == 1:
         branch = _branch_name_text(branch_namer, mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
@@ -833,7 +850,7 @@ def name_sulfur_subgraph(
             return f"({stereo_prefix_text}{branch}sulfanyl)"
         if branch:
             return format_element_substituent(stereo_prefix_text, branch, "sulfanyl", is_double=is_double)
-        return f"{stereo_prefix_text}{'sulfanylidene' if is_double else 'sulfanyl'}"
+        return f"{stereo_prefix_text}{'sulfanylidene' if is_double else styled_thiol_prefix('sulfanyl')}"
 
     branches = [
         br
@@ -1038,8 +1055,22 @@ def name_heteroatom_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str | None:
-    """Name supported heteroatom-starting recursive fragments."""
+    """Name supported heteroatom-starting recursive fragments.
+    Return None for an unsupported heteroatom and "" when a ligand branch cannot be named."""
 
+    try:
+        return _name_supported_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
+    except _UnnamedBranch:
+        return ""
+
+
+def _name_supported_heteroatom_subgraph(
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int | None,
+    branch_namer: RecursiveSubgraphNamer,
+) -> str | None:
     symbol = mol.atoms[start_idx].symbol
     if symbol in HALOGEN_PREFIXES:
         return name_halogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
@@ -1059,7 +1090,7 @@ def name_heteroatom_subgraph(
         )
     if symbol in {"P", "As", "Sb"}:
         return name_pnictogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer, symbol)
-    if symbol in {"Si", "B"}:
+    if symbol in {"Si", "Ge", "Sn", "Pb", "B"}:
         return name_group_13_14_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
     return None
 

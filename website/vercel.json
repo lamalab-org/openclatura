@@ -3,6 +3,10 @@
   "outputDirectory": "public",
   "git": { "deploymentEnabled": false },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" }
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/smiles=(.*)", "destination": "/api/index" },
+    { "source": "/describe=(.*)", "destination": "/api/index" },
+    { "source": "/name", "destination": "/api/index" },
+    { "source": "/describe", "destination": "/api/index" }
   ]
 }

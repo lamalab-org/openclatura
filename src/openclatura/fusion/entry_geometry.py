@@ -96,7 +96,7 @@ def _linear_face_chain(neighbors: dict[int, list[int]]) -> bool:
 @lru_cache(maxsize=128)
 def entry_direction_geometry(
     model: FaceModel,
-    search_budget: int,
+    search_budget: int | None,
     terminal_cycle: tuple[int, ...] | None = None,
     allow_distorted: bool = False,
 ) -> tuple[FusedLayout, tuple[EntryDirectionWitness, ...]] | None:

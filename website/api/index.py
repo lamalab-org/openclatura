@@ -9,6 +9,9 @@ so the openclatura FastAPI app is mounted under ``/api``:
 - POST /api/describe
 - GET  /api/healthz   (also reports the release channel)
 
+Plain GET routes for web agents (``/smiles=…``, ``/describe=…``, ``/name``,
+``/describe``) are rewritten here too; see "Agent interface" below.
+
 The Vercel Python runtime ships no Java, which py2opsin needs for OPSIN
 verification. A jlink-minimized JRE (java.base, java.xml, java.logging,
 java.naming, java.management, java.desktop — the closure OPSIN's log4j
@@ -17,12 +20,14 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 ``shutil.which("java")``.
 """
 
+import collections
 import ctypes
 import dataclasses
 import hashlib
 import importlib.metadata
 import inspect
 import json
+import math
 import os
 import re
 import select
@@ -137,7 +142,8 @@ _ensure_java()
 # on Vercel only /tmp is writable.
 os.chdir(tempfile.gettempdir())
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request, Response  # noqa: E402
+from fastapi.responses import JSONResponse, PlainTextResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 from rdkit import Chem  # noqa: E402
 
@@ -2299,6 +2305,198 @@ def polymer_options() -> dict:
         ],
         "commodity_count": len(_COMMODITY_INDEX),
     }
+
+
+# ---------------------------------------------------------------------------
+# Agent interface.
+#
+# Plain GET URLs for web agents, which can fetch a page but not drive the
+# editor or POST JSON. Text answers carry what the CLI prints:
+#
+#   GET /smiles=<SMILES>            the name       (`openclatura name`)
+#   GET /describe=<SMILES>          the description (`openclatura describe`)
+#   GET /name?smiles=<SMILES>       the same two, with the SMILES in the query
+#   GET /describe?smiles=<SMILES>
+#
+# The query form exists because URL parsers (browsers, Node's fetch) rewrite
+# '\' to '/' in a path, so F/C=C\F would arrive as F/C=C/F with its stereo
+# flipped; in a query string the backslash survives.
+#
+# Query options: format=json returns the POST /api/name or /api/describe
+# payload instead of text; verify=0 skips the OPSIN round-trip, which is on by
+# default as in the CLI; no_cache=1 keeps the structure out of the cache. The
+# handlers call those POST endpoints, so caching and OPSIN locking are shared.
+# public/llms.txt is the agent-facing documentation.
+#
+# Each client IP may name AGENT_RATE_LIMIT (default 10) molecules per second.
+# The count is kept in this process, so it holds per instance: a client spread
+# over two warm instances gets up to twice that. A Vercel Firewall rate-limit
+# rule is the place for a hard, deployment-wide cap.
+# ---------------------------------------------------------------------------
+_AGENT_RATE_LIMIT = int(os.environ.get("AGENT_RATE_LIMIT") or 10)
+
+_AGENT_USAGE = """\
+openclatura: SMILES -> IUPAC name
+
+  GET {base}/smiles=<SMILES>          name
+  GET {base}/describe=<SMILES>        how the name is built
+  GET {base}/name?smiles=<SMILES>     name (keeps '\\' intact)
+  GET {base}/describe?smiles=<SMILES>
+
+Percent-encode the SMILES ('#' -> %23, '%' -> %25, '\\' -> %5C).
+Options: format=json, verify=0, no_cache=1. Full guide: {base}/llms.txt
+"""
+
+# Unescaped, these end or garble the URL before the SMILES reaches the server.
+_AGENT_ESCAPE_HINT = "percent-encode '#' as %23, '%' as %25 and '\\' as %5C"
+
+
+class _RateLimiter:
+    """Sliding one-second window of request times per client.
+
+    ``hit`` records a request and returns ``(0, remaining)``, or, when the
+    client already has ``limit`` requests in the window, records nothing and
+    returns ``(seconds until the oldest leaves it, 0)``.
+    """
+
+    def __init__(self, limit: int, window: float = 1.0) -> None:
+        self.limit = limit
+        self._window = window
+        self._hits: dict[str, collections.deque[float]] = {}
+        self._lock = threading.Lock()
+        self._next_sweep = 0.0
+
+    def hit(self, client: str, now: float | None = None) -> tuple[float, int]:
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            if now >= self._next_sweep:
+                # Forget clients that went quiet, so the table cannot grow without bound.
+                self._hits = {k: q for k, q in self._hits.items() if q and now - q[-1] < self._window}
+                self._next_sweep = now + 60.0
+            times = self._hits.setdefault(client, collections.deque())
+            while times and now - times[0] >= self._window:
+                times.popleft()
+            if len(times) >= self.limit:
+                return self._window - (now - times[0]), 0
+            times.append(now)
+            return 0.0, self.limit - len(times)
+
+
+_AGENT_LIMITER = _RateLimiter(_AGENT_RATE_LIMIT)
+
+
+def _client_ip(request: Request) -> str:
+    # Vercel overwrites these with the connecting address, so a client cannot
+    # pick its own bucket by sending them.
+    for header in ("x-vercel-forwarded-for", "x-real-ip", "x-forwarded-for"):
+        value = request.headers.get(header)
+        if value:
+            return value.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _agent_query(request: Request) -> dict[str, str]:
+    """Query parameters, decoded without turning '+' into a space.
+
+    '+' is a charge in SMILES ([NH4+]) and agents seldom escape it, while a
+    space never occurs in one, so the literal reading is the right one.
+    """
+    params: dict[str, str] = {}
+    for part in request.scope.get("query_string", b"").decode("utf-8", "replace").split("&"):
+        key, _, value = part.partition("=")
+        if key:
+            params.setdefault(urllib.parse.unquote(key), urllib.parse.unquote(value))
+    return params
+
+
+def _agent_path_smiles(request: Request, prefix: str) -> str:
+    """The SMILES after ``prefix`` in the path, percent-decoded exactly once.
+
+    Read from ``raw_path``: uvicorn decodes ``path`` but Vercel's runtime hands
+    it over still encoded, and only the raw bytes mean the same under both.
+    """
+    raw = request.scope.get("raw_path") or request.scope["path"].encode()
+    return urllib.parse.unquote(raw.decode("utf-8", "replace")[len(prefix) :])
+
+
+def _agent_flag(params: dict[str, str], key: str, default: bool) -> bool:
+    if key not in params:
+        return default
+    return params[key].strip().lower() not in ("0", "false", "no", "off")
+
+
+def _agent_name_text(smiles: str, payload: dict) -> str:
+    """What `openclatura name` prints, stdout then stderr, after the input.
+
+    The SMILES is echoed because an unescaped '#' ends the URL: CC#N arrives
+    as CC and is named ethane. Seeing what the server read is how an agent
+    catches that.
+    """
+    lines = [f"smiles: {smiles}"]
+    if payload.get("ok"):
+        lines.append(f"name: {payload['name']}")
+        if payload.get("opsin_check"):
+            lines.append(f"opsin: {payload['opsin_check']['status']}")
+    else:
+        lines.append(f"error: {payload.get('error') or 'could not be named by the current ruleset'}")
+    return "\n".join(lines) + "\n"
+
+
+def _agent_reply(request: Request, smiles: str, kind: str) -> Response:
+    wait, remaining = _AGENT_LIMITER.hit(_client_ip(request))
+    headers = {
+        # Public, credential-free results: any page may fetch them.
+        "Access-Control-Allow-Origin": "*",
+        "X-RateLimit-Limit": str(_AGENT_LIMITER.limit),
+        "X-RateLimit-Remaining": str(remaining),
+    }
+    if wait:
+        headers["Retry-After"] = str(math.ceil(wait))
+        message = f"error: at most {_AGENT_LIMITER.limit} molecules per second per IP; retry in {wait:.1f} s\n"
+        return PlainTextResponse(message, 429, headers)
+    smiles = smiles.strip()
+    if not smiles:
+        return PlainTextResponse(_AGENT_USAGE.format(base=str(request.base_url).rstrip("/")), 400, headers)
+    params = _agent_query(request)
+    no_cache = _agent_flag(params, "no_cache", False)
+    if kind == "name":
+        verify = _agent_flag(params, "verify", True)
+        payload = name_endpoint(NameRequest(smiles=smiles, verify_opsin=verify, no_cache=no_cache))
+        ok = bool(payload.get("ok"))
+    else:
+        payload = describe_endpoint(DescribeRequest(smiles=smiles, no_cache=no_cache))
+        ok = bool(payload.get("name"))
+    # Checked only after a failure, so nothing the namer accepts is turned away.
+    if not ok and Chem.MolFromSmiles(smiles) is None:
+        payload = {"ok": False, "smiles": smiles, "error": f"not a valid SMILES; {_AGENT_ESCAPE_HINT}"}
+    status = 200 if ok else 422
+    if params.get("format", "").lower() == "json":
+        return JSONResponse(payload, status, headers)
+    if kind == "describe" and "paragraphs" in payload:
+        text = "\n\n".join(payload["paragraphs"]) + "\n"
+    else:
+        text = _agent_name_text(smiles, payload)
+    return PlainTextResponse(text, status, headers)
+
+
+@app.get("/smiles={smiles:path}", include_in_schema=False)
+def agent_name_path(request: Request) -> Response:
+    return _agent_reply(request, _agent_path_smiles(request, "/smiles="), "name")
+
+
+@app.get("/describe={smiles:path}", include_in_schema=False)
+def agent_describe_path(request: Request) -> Response:
+    return _agent_reply(request, _agent_path_smiles(request, "/describe="), "describe")
+
+
+@app.get("/name", include_in_schema=False)
+def agent_name_query(request: Request) -> Response:
+    return _agent_reply(request, _agent_query(request).get("smiles", ""), "name")
+
+
+@app.get("/describe", include_in_schema=False)
+def agent_describe_query(request: Request) -> Response:
+    return _agent_reply(request, _agent_query(request).get("smiles", ""), "describe")
 
 
 app.mount("/api", create_app())

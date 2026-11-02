@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from itertools import combinations
+from heapq import heappop, heappush
 
 from ..assembly_parts import NameTokenBinding
 from ..assembly_utils import needs_hyphen
@@ -33,14 +33,12 @@ from .composite_bridges import (
     composite_bridge_constructions,
     localized_carbon_bridge_bond_orders,
 )
-from .config import fusion_nomenclature_config
 from .exocyclic import is_neutral_external_pi_ligand
 from .mancude import ParentDerivativeState, parent_derivative_state
 from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondModel, PinDecision, PinStatus
 from .numbering import RetainedParentBondCapacityError, retained_template_parent_bond_model
 from .rules import fusion_ring_size_gate
 
-_WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 _COMPOSITE_BRIDGES = composite_bridge_constructions()
 _LOCALIZED_CARBON_BRIDGES = localized_carbon_bridge_bond_orders()
 
@@ -302,8 +300,6 @@ def plan_bridged_fusion_wrapper(
         for count, removed_candidates in candidate_groups:
             for removed in removed_candidates:
                 visited_states += 1
-                if visited_states > _WRAPPER_SEARCH_STATES:
-                    return None
                 parent_atoms = atoms - removed
                 parent = (
                     _retained_wrapper_parent(mol, parent_atoms)
@@ -496,23 +492,29 @@ def _bridge_removal_candidate_groups(
     bridge_segments: tuple[frozenset[int], ...],
     maximum_bridge_atoms: int | None,
 ):
-    """Yield bounded unions of complete junction-to-junction path interiors."""
+    """Yield path unions lazily in preferred removed-atom-count order."""
 
-    by_size: dict[int, set[frozenset[int]]] = {}
-    generated = 0
-    for count in range(1, len(bridge_segments) + 1):
-        for selected in combinations(bridge_segments, count):
-            generated += 1
-            if generated > _WRAPPER_SEARCH_STATES:
-                break
-            removed = frozenset().union(*selected)
-            if maximum_bridge_atoms is not None and len(removed) > maximum_bridge_atoms:
+    heap = []
+    for index, segment in enumerate(bridge_segments):
+        if maximum_bridge_atoms is None or len(segment) <= maximum_bridge_atoms:
+            heappush(heap, (len(segment), (index,), segment))
+
+    atom_count = None
+    same_size: set[frozenset[int]] = set()
+    while heap:
+        size, selected, removed = heappop(heap)
+        if atom_count is not None and size != atom_count:
+            yield atom_count, tuple(sorted(same_size, key=lambda atoms: tuple(sorted(atoms))))
+            same_size.clear()
+        atom_count = size
+        same_size.add(removed)
+        for index in range(selected[-1] + 1, len(bridge_segments)):
+            expanded = removed | bridge_segments[index]
+            if maximum_bridge_atoms is not None and len(expanded) > maximum_bridge_atoms:
                 continue
-            by_size.setdefault(len(removed), set()).add(removed)
-        if generated > _WRAPPER_SEARCH_STATES:
-            break
-    for atom_count in sorted(by_size):
-        yield atom_count, tuple(sorted(by_size[atom_count], key=lambda atoms: tuple(sorted(atoms))))
+            heappush(heap, (len(expanded), (*selected, index), expanded))
+    if atom_count is not None:
+        yield atom_count, tuple(sorted(same_size, key=lambda atoms: tuple(sorted(atoms))))
 
 
 def _junction_path_interiors(

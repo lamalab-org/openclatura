@@ -165,6 +165,36 @@ for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
 ```
 
+### Name style
+
+`style=` picks between equivalent spellings of the same name. The default
+output is unchanged; presets bundle the individual options, and any option can
+be overridden on top of a preset:
+
+```python
+from openclatura import name
+
+name("SCC=CCO").name                        # 4-sulfanylbut-2-en-1-ol
+name("SCC=CCO", style="traditional").name   # 4-mercapto-2-buten-1-ol
+name("CC=CC", locant_placement="before_parent").name  # 2-butene
+```
+
+| Option | Default | Alternative |
+|---|---|---|
+| `enclosing_marks` | `parentheses`: `2-((1-((…)amino)…)oxy)` | `nested`: `2-({1-[(…)amino]…}oxy)` (P-16.5.4); `alternating`: `2-[(1-[(…)amino]…)oxy]` |
+| `thiol_prefix` | `sulfanyl` | `mercapto` |
+| `locant_placement` | `before_suffix`: `but-2-ene`, `pentan-2-ol` | `before_parent`: `2-butene`, `2-pentanol` |
+| `heterocycle_names` | `retained`: `furan`, `pyrrolidine`, `pyrimidine` | `hantzsch_widman`: `oxole`, `azolidine`, `1,3-diazine` (pyridine and pyran stay; fused rings unaffected) |
+
+| Preset | `enclosing_marks` | `thiol_prefix` | `locant_placement` |
+|---|---|---|---|
+| `default` | parentheses | sulfanyl | before_suffix |
+| `iupac2013` | nested | sulfanyl | before_suffix |
+| `traditional` | nested | mercapto | before_parent |
+
+The CLI takes the same choices as `--style`, `--enclosing-marks`,
+`--thiol-prefix`, `--locant-placement` and `--heterocycle-names`.
+
 ## CLI
 
 ```bash

@@ -28,6 +28,7 @@ from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token
 from .name_bindings import refresh_name_atom_bindings, refresh_parent_binding
 from .name_operations import HydroOperation
 from .name_postprocessing import apply_data_postprocessing
+from .naming_style import place_parent_locants
 
 
 def _post_process_name(name: str) -> str:
@@ -247,9 +248,15 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str, *, allo
     if not indicated_hydrogens and not additive_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
-        # The ium suffix states the hydrogen on its own nitrogen, but a second,
-        # neutral ring NH still has to be cited: 4-imino-1H-pyrimidin-3-ium.
-        cationic_locants = {charge.locant for charge in positive_parent_n_charges(parts)}
+        # The ium suffix states the hydrogen on its own nitrogen when that
+        # nitrogen keeps a ring double bond, as in pyridin-1-ium. A second,
+        # neutral ring NH still has to be cited (1H-imidazol-3-ium), and so does
+        # a saturated ium nitrogen (1,1-dimethyl-4,5-dihydro-1H-imidazol-1-ium).
+        cationic_locants = {
+            charge.locant
+            for charge in positive_parent_n_charges(parts)
+            if any(order > 1 for edge, order in parts.parent_bond_orders_by_locants.items() if charge.locant in edge)
+        }
         indicated_hydrogens = [locant for locant in indicated_hydrogens if locant not in cationic_locants]
         if not additive_hydrogens and not indicated_hydrogens:
             return core_name
@@ -361,6 +368,9 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
             feature for feature in unique_stereo if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
         ]
     sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]) if f[0] else (0, ""))
+    if len(sorted_stereo) == 1 and sorted_stereo[0][0] == "N":
+        # A lone -aminium nitrogen descriptor needs no locant: (S)-N-ethyl-N-methyl-N-propylbenzenaminium.
+        sorted_stereo = [("", sorted_stereo[0][1])]
     stereo_str = "(" + ",".join(f"{loc}{st}" if loc else st for loc, st in sorted_stereo) + ")-"
     return stereo_str + final_word
 
@@ -466,6 +476,10 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         core_name = _add_indicated_hydrogen_prefix(parts, core_name, allow_locant_elision=not spiro_subs)
         core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str
+        # A charged parent keeps its spelling: moving the first locant set of
+        # ``piperidin-1-ium-3-olate`` would detach the ium locant.
+        if not (parts.is_substituent or spiro_subs or parts.is_spiro_component or parts.parent_charges):
+            core_name = place_parent_locants(core_name)
     parent_needs_prefix_hyphen = bool(
         prefix_str and positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens
     )

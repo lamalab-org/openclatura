@@ -139,6 +139,12 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
     if atom_metadata is None:
         atom_metadata = _atom_metadata(rdmol)
 
+    # A heteroatom centre whose configuration is lost to proton exchange is not a
+    # stereocentre; dropping its tag before perception keeps every downstream
+    # view of the molecule (descriptors, CIP maps, the audit's copy) in step.
+    for atom in rdmol.GetAtoms():
+        if atom.GetChiralTag() != Chem.rdchem.ChiralType.CHI_UNSPECIFIED and _achiral_by_proton_exchange(atom):
+            atom.SetChiralTag(Chem.rdchem.ChiralType.CHI_UNSPECIFIED)
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
     chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
     mol.legacy_cip = dict(chiral_centers)
@@ -211,6 +217,27 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             cip=modern_bond_cip.get((min(u, v), max(u, v))) if _AUDIT_CIP_ENABLED else None,
         )
     return mol
+
+
+def _achiral_by_proton_exchange(atom: Chem.Atom) -> bool:
+    """Whether a N, P, As, S or Se centre loses its configuration to proton
+    exchange or resonance: it carries a hydrogen (an N-H+ inverts by
+    deprotonation), or two of its neighbours are the same chalcogen or nitrogen
+    with no other heavy neighbour, as the =O and -OH of P(=O)(OH).  This is
+    OPSIN's ``StereoAnalyser.isAchiralDueToResonanceOrTautomerism``, so the
+    namer gives no descriptor that OPSIN would refuse to place."""
+
+    if atom.GetSymbol() not in {"N", "P", "As", "S", "Se"}:
+        return False
+    if atom.GetTotalNumHs(includeNeighbors=True):
+        return True
+    terminal_elements = []
+    for neighbor in atom.GetNeighbors():
+        if neighbor.GetSymbol() in {"O", "S", "Se", "Te", "N"} and all(
+            other.GetIdx() == atom.GetIdx() or other.GetAtomicNum() == 1 for other in neighbor.GetNeighbors()
+        ):
+            terminal_elements.append(neighbor.GetSymbol())
+    return len(terminal_elements) != len(set(terminal_elements))
 
 
 def _raw_tetrahedral_stereo(atom: Chem.Atom) -> str | None:

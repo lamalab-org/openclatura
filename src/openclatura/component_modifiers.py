@@ -9,6 +9,7 @@ from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
+from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import add_substituent_trace, decision_trace_data
@@ -189,6 +190,14 @@ def add_component_n_substituents(
             loc_prefix = guanidine_locants.get(single_n) or n_substituent_locant(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global, group_index
             )
+            nitrogen = mol.atoms[single_n]
+            if (
+                principal_key == "aminium"
+                and nitrogen.total_h_count == 0
+                and nitrogen.stereo in ABSOLUTE_STEREO_DESCRIPTORS
+            ):
+                # A quaternary aminium nitrogen has no numeric locant; its R/S is cited at its N locant.
+                parts.stereo_features.append((loc_prefix, nitrogen.stereo))
             for n_sub in n_substituents:
                 branch_decisions = DecisionTrace()
                 branch_name, branch_trace, branch_tree = _nitrogen_substituent_name(
