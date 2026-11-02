@@ -8,6 +8,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name_mol, opsin_available
+from openclatura.chains import find_ring_systems
 from openclatura.fusion import planner
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import (
@@ -16,6 +17,7 @@ from openclatura.fusion.layout import (
     OPSIN_RING_MAP_NUMBERING,
     RING_SHAPE_TEMPLATES,
     OpsinConstructionLayout,
+    OpsinEntryLayout,
     _coupled_pentagon_axis_centers,
     _opsin_occupied_row_orientation,
     _opsin_pentagon_chain,
@@ -24,7 +26,11 @@ from openclatura.fusion.layout import (
     preferred_intrinsic_layouts,
 )
 from openclatura.fusion.model import FusedLayout, FusionConfirmed, FusionMode
-from openclatura.fusion.numbering import _number_completed_system, _numbering_from_layout
+from openclatura.fusion.numbering import (
+    _number_completed_system,
+    _numbering_from_layout,
+    _opsin_29_completed_system_numbering,
+)
 from openclatura.fusion.registry import fusion_component_registry
 from openclatura.graph_io import read_rdkit_mol
 from openclatura.opsin_verify import verify_with_opsin
@@ -100,7 +106,7 @@ CASES = (
     (
         59728,
         "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
-        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd]2-benzofuran",
+        "cyclopenta[1''',2''':1'',2'']benzo[3'',4'':1',2']cyclohepta[3',4':2,3]furo[5,4-b]pyran",
     ),
     (
         64746,
@@ -144,6 +150,8 @@ CASES = (
         "[1,2,4]triazolo[1,5-d]imidazo[1,5-a]benzo[f][1,4]diazepine",
     ),
 )
+
+OPSIN_INCOMPATIBLE_INTERIOR_CASES = frozenset({31149, 32572, 79496, 11029})
 
 
 def _capture_plans(monkeypatch, base):
@@ -189,7 +197,9 @@ def _opsin_labelled_graph(base, tmp_path):
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
 @pytest.mark.parametrize("index,smiles,base", CASES, ids=[str(case[0]) for case in CASES])
 def test_exact_structures_and_complete_locant_graphs_under_permutations(index, smiles, base, monkeypatch, tmp_path):
-    expected_elements, expected_edges = _opsin_labelled_graph(base, tmp_path)
+    expected_elements, expected_edges = (
+        (None, None) if index in OPSIN_INCOMPATIBLE_INTERIOR_CASES else _opsin_labelled_graph(base, tmp_path)
+    )
     graph = Chem.MolFromSmiles(smiles)
     order = list(range(graph.GetNumAtoms()))
     shuffled = order.copy()
@@ -201,6 +211,16 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
         result = name_mol(Chem.RenumberAtoms(graph, indices), fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
         assert result.name.isascii()
+        if index in OPSIN_INCOMPATIBLE_INTERIOR_CASES:
+            # The rule-correct mapping remains tested independently below;
+            # production must continue to a construction OPSIN can interpret.
+            assert base not in result.name
+            check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
+            assert check.status == "matched", (index, check.to_dict())
+            maps.append(set())
+            constructions.append(set())
+            names.append(result.name)
+            continue
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
         assert check.status == "matched", (index, check.to_dict())
         assert check.canonical_original == check.canonical_roundtrip
@@ -245,13 +265,21 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
 
 @pytest.fixture
 def carbon_context(monkeypatch):
-    _, smiles, base = CASES[1]
+    _, smiles, base = CASES[2]
     graph = Chem.MolFromSmiles(smiles)
-    plans = _capture_plans(monkeypatch, base)
+    original = planner._complete_fusion_plan
+    contexts = []
+
+    def capture(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if isinstance(result, FusionConfirmed) and result.plan.rendered_base_name.endswith(base):
+            contexts.append((args[0], result.plan))
+        return result
+
+    monkeypatch.setattr(planner, "_complete_fusion_plan", capture)
     result = name_mol(graph, fusion_mode=FusionMode.AUDITED_PIN)
-    assert result.error is None and plans
-    plan = plans[0]
-    mol = read_rdkit_mol(graph)
+    assert result.error is None and contexts
+    mol, plan = contexts[0]
     bounded = select_bounded_face_model(mol, dict(plan.numbering.abstract_atom_to_locant))
     assert bounded is not None
     return mol, bounded, plan
@@ -261,20 +289,19 @@ def test_compatibility_is_explicit_and_preserves_graph_only_numbering(carbon_con
     mol, bounded, plan = carbon_context
     proof = plan.numbering
     expected = dict(proof.abstract_atom_to_locant)
-    perimeter = tuple(sorted(bounded.outer_boundary.atoms, key=lambda atom: expected[atom]))
+    assert isinstance(proof.selected_layout, OpsinEntryLayout)
+    perimeter = proof.selected_layout.entry_perimeter
     original = _number_completed_system(mol, bounded, perimeter, set(bounded.fusion_atoms))
-    compatible = _number_completed_system(
+    compatible = _opsin_29_completed_system_numbering(
         mol,
         bounded,
         perimeter,
         set(bounded.fusion_atoms),
-        opsin_atom_order=proof.selected_layout.construction_atom_order,
+        proof.selected_layout.construction_atom_order,
     )
-    assert compatible == expected
-    assert set(original) == set(compatible) == set(bounded.atom_ids)
-    assert all(original[atom] == compatible[atom] for atom in perimeter)
-    assert all(original[atom].interior_distance == 1 for atom in bounded.interior_atoms)
-    assert all(compatible[atom].interior_distance is None for atom in bounded.interior_atoms)
+    assert original == compatible == expected
+    assert set(original) == set(bounded.atom_ids)
+    assert all(original[atom].interior_distance is None for atom in bounded.interior_atoms)
 
 
 def test_ring_map_compatibility_abstains_outside_the_proved_tree_family(carbon_context):
@@ -363,7 +390,7 @@ def test_construction_witness_rejects_missing_or_duplicate_atoms(carbon_context)
             replace(layout, construction_atom_order=malformed)
 
 
-def test_numbering_cache_includes_construction_provenance(carbon_context):
+def test_rule_numbering_cache_excludes_opsin_construction_provenance(carbon_context):
     mol, bounded, plan = carbon_context
     proof = plan.numbering
     layout = proof.selected_layout
@@ -377,36 +404,44 @@ def test_numbering_cache_includes_construction_provenance(carbon_context):
         for index, candidate in enumerate((ordinary, layout, reversed_order, layout))
     ]
     assert all(result is not None for result in results)
-    assert len(cache) == 3
-    assert results[0].atom_to_locant != results[1].atom_to_locant
-    assert results[1].atom_to_locant != results[2].atom_to_locant
-    assert results[1].atom_to_locant == results[3].atom_to_locant
+    assert len(cache) == 1
+    assert all(result.atom_to_locant == results[0].atom_to_locant for result in results)
+    assert results[0].opsin_compatible is None
+    assert results[1].opsin_compatible is True
+    assert results[2].opsin_compatible is False
+    assert results[3].opsin_compatible is True
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
-def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(carbon_context):
-    _, bounded, _ = carbon_context
+def test_distinguishable_interior_substituents_use_parser_compatible_fallbacks():
+    source = Chem.MolFromSmiles(CASES[1][1])
+    mol = read_rdkit_mol(source)
+    atoms = max(find_ring_systems(mol), key=lambda ring: len(ring.atoms)).atoms
+    bounded = select_bounded_face_model(mol, atoms)
+    assert bounded is not None
+    names = []
     for atom in bounded.interior_atoms:
-        variant = Chem.RWMol(Chem.MolFromSmiles(CASES[1][1]))
+        variant = Chem.RWMol(source)
         methyl = variant.AddAtom(Chem.Atom(6))
         variant.AddBond(atom, methyl, Chem.BondType.SINGLE)
         Chem.SanitizeMol(variant)
         smiles = Chem.MolToSmiles(variant)
         result = name_mol(variant, fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
+        names.append(result.name)
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
-        assert check.canonical_original == check.canonical_roundtrip
+    assert len(set(names)) == len(bounded.interior_atoms)
 
 
-def test_compatibility_witness_reaches_the_existing_accepted_orientation_trace():
+def test_incompatible_construction_witness_continues_to_verified_parent_method():
     index = 32572
     smiles = next(smiles for case, smiles, _ in CASES if case == index)
     result = name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
     assert result.error is None
-    orientation = next(step for step in result.decisions if step.decision == "selected preferred fusion orientation")
-    assert OPSIN_CONSTRUCTION_NUMBERING in orientation.data["audit_evidence"]
-    assert any("PIN not certified" in evidence for evidence in orientation.data["audit_evidence"])
+    assert result.parent_nomenclature == "bridged_fusion"
+    assert any(step.decision == "systematic fusion fallback" for step in result.decisions)
+    assert verify_with_opsin(result.name, smiles, standardize_smiles=False).status == "matched"
 
 
 def test_entry_compatibility_witness_projects_through_existing_plan_trace(monkeypatch):

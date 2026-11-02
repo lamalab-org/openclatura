@@ -17,12 +17,14 @@ from itertools import combinations
 from typing import Protocol
 
 from ..assembly_parts import NameTokenBinding
+from ..canonical_ranks import canonical_ranks
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..rules import multipliers
 from .config import fusion_nomenclature_config
 from .cover import ComponentScope, CoverGraph, FusionInterface, audit_component_cover, component_scope
+from .faces import cached_bounded_face_model
 from .model import (
     ComponentLocant,
     FusionCitationNode,
@@ -47,21 +49,11 @@ from .rules import (
     multiplicative_member_order_key,
 )
 
-_LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
-MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
-MAX_FACES = _LIMITS.maximum_faces
-MAX_COMPONENT_SELECTIONS = _LIMITS.maximum_component_selections
-MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
-MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
 
 class FusionDescriptorError(ValueError):
     """Raised when the bounded descriptor tier cannot prove a valid AST."""
-
-
-class _LocantMapBudgetExceeded(RuntimeError):
-    """Internal signal that one candidate cover exceeded its deterministic budget."""
 
 
 class _Registry(Protocol):
@@ -158,6 +150,8 @@ def build_fusion_name_ast(
     join_kinds: Iterable[str] | None = None,
     multiparent_parents: bool | None = None,
     enforce_interoperability_limits: bool = True,
+    required_parent_atom_ids: Iterable[int] | None = None,
+    required_parent_edges: Iterable[tuple[int, int]] | None = None,
 ) -> FusionNameAst:
     """Return the preferred citation; chemical planning consumes the iterator."""
 
@@ -170,6 +164,8 @@ def build_fusion_name_ast(
             join_kinds=join_kinds,
             multiparent_parents=multiparent_parents,
             enforce_interoperability_limits=enforce_interoperability_limits,
+            required_parent_atom_ids=required_parent_atom_ids,
+            required_parent_edges=required_parent_edges,
         )
     )
 
@@ -183,6 +179,8 @@ def iter_fusion_name_asts(
     join_kinds: Iterable[str] | None = None,
     multiparent_parents: bool | None = None,
     enforce_interoperability_limits: bool = True,
+    required_parent_atom_ids: Iterable[int] | None = None,
+    required_parent_edges: Iterable[tuple[int, int]] | None = None,
 ) -> Iterator[FusionNameAst]:
     """Build the preferred bounded fusion citation from exact component maps.
 
@@ -203,14 +201,25 @@ def iter_fusion_name_asts(
     if not supported_joins <= {"ortho", "ortho_peri", "higher_order"}:
         raise ValueError("unknown fusion join kind")
 
-    options = _occurrence_options(component_matches, registry)
+    if (required_parent_atom_ids is None) != (required_parent_edges is None):
+        raise ValueError("required parent atoms and edges must be supplied together")
+    target_atoms = None if required_parent_atom_ids is None else frozenset(required_parent_atom_ids)
+    target_edges = (
+        None if required_parent_edges is None else frozenset(normalize_edge(*edge) for edge in required_parent_edges)
+    )
+    if target_atoms is not None and any(not set(edge) <= target_atoms for edge in target_edges):
+        raise ValueError("required parent edges must have both endpoints in the required atom set")
+
+    options = _occurrence_options(mol, component_matches, registry)
+    if target_atoms is not None:
+        available_atoms = frozenset(atom for option in options for atom in option.atom_ids)
+        if available_atoms != target_atoms:
+            raise FusionDescriptorError("fusion component matches do not cover the selected parent atom set")
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
     if len(face_ids) < 2:
         raise FusionDescriptorError("a fusion citation requires at least two component faces")
-    if len(face_ids) > MAX_FACES:
-        raise FusionDescriptorError(f"face count {len(face_ids)} exceeds bounded limit {MAX_FACES}")
 
-    selections = _exact_component_covers(options, frozenset(face_ids))
+    selections = _exact_component_covers(options, frozenset(face_ids), target_atom_ids=target_atoms)
     parent_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
     for option in options:
         spec = _spec_for_match(registry, option.mappings[0])
@@ -218,7 +227,6 @@ def iter_fusion_name_asts(
             parent_scopes[component_variant_identity(spec)].add(option.atom_ids)
     parent_scopes = {variant: scopes for variant, scopes in parent_scopes.items() if len(scopes) > 1}
 
-    budget_exhausted = 0
     selections_by_preference: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
     for selection in selections:
         prepared = _prepare_component_selection(
@@ -228,6 +236,8 @@ def iter_fusion_name_asts(
             supported_covers=supported_covers,
             supported_joins=supported_joins,
             parent_scopes=parent_scopes,
+            target_atom_ids=target_atoms,
+            target_edges=target_edges,
         )
         if prepared is None:
             continue
@@ -243,20 +253,17 @@ def iter_fusion_name_asts(
         candidates: list[_Candidate] = []
         parent_seniority, _location_prefix = preference
         for prepared in selections_by_preference[preference]:
-            try:
-                candidates.extend(
-                    _candidates_for_component_selection(
-                        mol,
-                        prepared,
-                        registry,
-                        supported_joins=supported_joins,
-                        allow_multiparent_parents=allow_multiparent_parents,
-                        enforce_interoperability_limits=enforce_interoperability_limits,
-                        required_parent_seniority=parent_seniority,
-                    )
+            candidates.extend(
+                _candidates_for_component_selection(
+                    mol,
+                    prepared,
+                    registry,
+                    supported_joins=supported_joins,
+                    allow_multiparent_parents=allow_multiparent_parents,
+                    enforce_interoperability_limits=enforce_interoperability_limits,
+                    required_parent_seniority=parent_seniority,
                 )
-            except _LocantMapBudgetExceeded:
-                budget_exhausted += 1
+            )
         # The rendered name orders candidates that every structural criterion
         # leaves tied, so it is only needed within a tie. Ranking the whole set
         # by it meant rendering thousands of citations per system when the
@@ -266,10 +273,6 @@ def iter_fusion_name_asts(
                 emitted.append(ast)
                 yield ast
     if not emitted:
-        if budget_exhausted:
-            raise FusionDescriptorError(
-                f"all viable component covers exceeded the locant-map budget of {MAX_LOCANT_MAP_COMBINATIONS} states"
-            )
         tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
         raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
 
@@ -291,8 +294,16 @@ def _selection_preference_tiers(
         if component_parent_eligible(match, spec, prepared.matches):
             roots_by_seniority[component_spec_seniority_key(spec).as_tuple()].append(match.occurrence_id)
 
+    # The independent audit requires every declared parent to have the best
+    # intrinsic seniority among all eligible components in this exact cover.
+    # Lower tiers can therefore never produce a valid plan; do not construct
+    # their local-map combinations and ASTs only to reject them after complete
+    # numbering, bond-model, and reconstruction work.
+    preferred_seniority = min(roots_by_seniority, default=None)
     result = []
     for seniority, roots in roots_by_seniority.items():
+        if seniority != preferred_seniority:
+            continue
         root_sets = [(root,) for root in roots]
         if allow_multiparent_parents:
             roots_by_variant: dict[tuple, list[int]] = defaultdict(list)
@@ -324,18 +335,24 @@ def _prepare_component_selection(
     supported_covers: frozenset[str],
     supported_joins: frozenset[str],
     parent_scopes: Mapping[tuple, set[frozenset[int]]] | None = None,
+    target_atom_ids: frozenset[int] | None = None,
+    target_edges: frozenset[tuple[int, int]] | None = None,
 ) -> _PreparedComponentSelection | None:
     """Normalize and audit one exact component cover once."""
 
-    if len(options) > MAX_COMPONENT_OCCURRENCES:
-        return None
-    ordered = tuple(sorted(options, key=_occurrence_option_key))
+    target_atoms = frozenset(atom for option in options for atom in option.atom_ids)
+    ranks = _interior_component_order_ranks(mol, target_atoms)
+    ordered = tuple(sorted(options, key=lambda option: _occurrence_option_key(option, ranks)))
     matches = tuple(replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered))
     specs = {match.occurrence_id: _spec_for_match(registry, match) for match in matches}
     scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in matches)
-    target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
-    target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
-    audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
+    reconstructed_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
+    reconstructed_edges = frozenset(edge for scope in scopes for edge in scope.edges)
+    audit = audit_component_cover(
+        scopes,
+        target_atom_ids=reconstructed_atoms if target_atom_ids is None else target_atom_ids,
+        target_edges=reconstructed_edges if target_edges is None else target_edges,
+    )
     if not audit.ok or audit.proof.kind not in supported_covers:
         return None
     if any(_interface_support_key(interface) not in supported_joins for interface in audit.graph.interfaces):
@@ -609,6 +626,7 @@ def _parent_component_name(spec: FusionComponentSpec) -> str:
 
 
 def _occurrence_options(
+    mol: Molecule,
     matches: Sequence[FusionComponentMatch],
     registry: _Registry | Mapping[str, FusionComponentSpec],
 ) -> tuple[_OccurrenceOption, ...]:
@@ -621,20 +639,24 @@ def _occurrence_options(
     if not grouped:
         raise FusionDescriptorError("no exact component matches were supplied")
 
+    target_atoms = frozenset(atom for match in matches for _, atom in match.local_to_input_atom)
+    ranks = _interior_component_order_ranks(mol, target_atoms)
     options: list[_OccurrenceOption] = []
     for (face_ids, spec_key, _template_name, atom_ids), mappings in grouped.items():
         _spec_for_match(registry, mappings[0])
         unique = {mapping.local_to_input_atom: mapping for mapping in mappings}
-        ordered = tuple(unique[key] for key in sorted(unique, key=_local_map_key))
+        ordered = tuple(unique[key] for key in sorted(unique, key=lambda mapping: _local_map_key(mapping, ranks)))
         options.append(_OccurrenceOption(face_ids, spec_key, atom_ids, ordered))
-    return tuple(sorted(options, key=_occurrence_option_key))
+    return tuple(sorted(options, key=lambda option: _occurrence_option_key(option, ranks)))
 
 
 def _exact_component_covers(
     options: Sequence[_OccurrenceOption],
     target_face_ids: frozenset[int],
+    *,
+    target_atom_ids: frozenset[int] | None = None,
 ) -> tuple[tuple[_OccurrenceOption, ...], ...]:
-    """Enumerate bounded, deterministic, disjoint covers of all target faces."""
+    """Enumerate deterministic covers of the complete target graph."""
 
     by_face: dict[int, tuple[_OccurrenceOption, ...]] = {
         face_id: tuple(option for option in options if face_id in option.face_ids)
@@ -644,32 +666,35 @@ def _exact_component_covers(
         raise FusionDescriptorError("component matches do not cover every fusion face")
 
     covers: list[tuple[_OccurrenceOption, ...]] = []
-    visited_states = 0
 
-    def visit(covered: frozenset[int], selected: tuple[_OccurrenceOption, ...]) -> None:
-        nonlocal visited_states
-        visited_states += 1
-        if visited_states > MAX_COMPONENT_SELECTION_STATES:
-            raise FusionDescriptorError(
-                f"component cover search exceeds bounded limit {MAX_COMPONENT_SELECTION_STATES}"
-            )
+    def visit(
+        covered: frozenset[int],
+        selected_atoms: frozenset[int],
+        selected: tuple[_OccurrenceOption, ...],
+    ) -> None:
         if covered == target_face_ids:
+            if target_atom_ids is not None and selected_atoms != target_atom_ids:
+                return
             covers.append(selected)
-            if len(covers) > MAX_COMPONENT_SELECTIONS:
-                raise FusionDescriptorError(
-                    f"component selection count exceeds bounded limit {MAX_COMPONENT_SELECTIONS}"
-                )
             return
-        if len(selected) >= MAX_COMPONENT_OCCURRENCES:
-            return
+        if target_atom_ids is not None:
+            compatible = (
+                option for option in options if not option.face_ids & covered and option.face_ids <= target_face_ids
+            )
+            possible_atoms = selected_atoms | frozenset(atom for option in compatible for atom in option.atom_ids)
+            if not target_atom_ids <= possible_atoms:
+                return
         uncovered = target_face_ids - covered
         pivot = min(uncovered, key=lambda face_id: (len(by_face[face_id]), face_id))
         for option in by_face[pivot]:
             if option.face_ids & covered or not option.face_ids <= target_face_ids:
                 continue
-            visit(covered | option.face_ids, selected + (option,))
+            next_atoms = selected_atoms | option.atom_ids
+            if target_atom_ids is not None and not next_atoms <= target_atom_ids:
+                continue
+            visit(covered | option.face_ids, next_atoms, selected + (option,))
 
-    visit(frozenset(), ())
+    visit(frozenset(), frozenset(), ())
     if not covers:
         raise FusionDescriptorError("no bounded exact component cover was found")
     return tuple(covers)
@@ -800,7 +825,7 @@ def _candidates_for_root_sets(
     for topology in topologies:
         if any(not specs[occurrence].usable_as_attached for occurrence in topology.parent_by_child):
             continue
-        if len(topology.roots) == 1 and not (topology.interparent_pairs or topology.cycle_closing_pairs):
+        if len(topology.roots) == 1:
             candidate = _best_tree_mapping_candidate(
                 mapping_sets,
                 specs,
@@ -815,6 +840,11 @@ def _candidates_for_root_sets(
             if candidate is not None:
                 candidates.append(candidate)
             continue
+        best_assignments = []
+        best_score = None
+        normalized_join_cache: dict[tuple[int, int, int], FusionJoin] = {}
+        closing_validity_cache: dict[tuple[frozenset[int], int, int], bool] = {}
+        attachment_key_cache: dict[tuple[int, int, int], tuple] = {}
         for selected_maps, selected_joins in _compatible_mapping_assignments(
             mapping_sets,
             specs,
@@ -824,6 +854,27 @@ def _candidates_for_root_sets(
             interface_by_pair,
             mol,
         ):
+            score = _mapping_candidate_score(
+                selected_maps,
+                specs,
+                topology,
+                interface_by_pair,
+                mol,
+                supported_joins,
+                enforce_interoperability_limits,
+                selected_joins,
+                normalized_join_cache,
+                closing_validity_cache,
+                attachment_key_cache,
+            )
+            if score is not None and (best_score is None or score < best_score):
+                best_score = score
+                best_assignments = [(selected_maps, selected_joins)]
+            elif score is not None and score == best_score:
+                best_assignments.append((selected_maps, selected_joins))
+        best_candidate = None
+        best_rendered = None
+        for selected_maps, selected_joins in best_assignments:
             candidate = _build_candidate(
                 selected_maps,
                 specs,
@@ -836,8 +887,14 @@ def _candidates_for_root_sets(
                 enforce_interoperability_limits,
                 classified_primary=selected_joins,
             )
-            if candidate is not None:
-                candidates.append(candidate)
+            if candidate is None or candidate.score != best_score:
+                raise FusionDescriptorError("fusion mapping preference evaluation disagrees with candidate build")
+            rendered = render_fusion_name(candidate.build_ast(), registry)
+            if best_rendered is None or rendered < best_rendered:
+                best_candidate = candidate
+                best_rendered = rendered
+        if best_candidate is not None:
+            candidates.append(best_candidate)
     return candidates
 
 
@@ -899,6 +956,7 @@ def _best_tree_mapping_candidate(
     projected = _deduplicate_interface_equivalent_maps(
         mapping_sets,
         interface_by_pair.values(),
+        mol,
     )
     root = topology.roots[0]
     children: dict[int, tuple[int, ...]] = {
@@ -909,7 +967,20 @@ def _best_tree_mapping_candidate(
     selected_joins: dict[int, FusionJoin] = {}
     side_ranks: dict[int, int] = {}
     best: _Candidate | None = None
-    visited_states = 0
+    classified_join_cache: dict[tuple[int, int, int, int], tuple[FusionJoin, int] | None] = {}
+    attached_key_cache: dict[int, tuple] = {}
+
+    def attached_key(join: FusionJoin) -> tuple:
+        key = id(join.interface)
+        cached = attached_key_cache.get(key)
+        if cached is None:
+            cached = _attached_locant_key(join)
+            attached_key_cache[key] = cached
+        return cached
+
+    def join_preference_key(child: int) -> tuple:
+        join = selected_joins[child]
+        return (join.order, side_ranks[child], attached_key(join))
 
     def prefix_is_worse(prefix: tuple[tuple, ...]) -> bool:
         if best is None:
@@ -930,7 +1001,18 @@ def _best_tree_mapping_candidate(
             enforce_interoperability_limits,
             classified_primary={child: (join, side_ranks[child]) for child, join in selected_joins.items()},
         )
-        if candidate is not None and (best is None or candidate.score < best.score):
+        if candidate is None:
+            return
+        if best is None or candidate.score < best.score:
+            best = candidate
+            return
+        if candidate.score == best.score and render_fusion_name(candidate.build_ast(), registry) < render_fusion_name(
+            best.build_ast(), registry
+        ):
+            # The rendered citation is the final deterministic tiebreaker.
+            # Closing joins are absent from the structural preference key, so
+            # cyclic covers can reach this tie even when their rendered
+            # higher-order descriptors differ.
             best = candidate
 
     def visit_ordered_children(
@@ -945,7 +1027,7 @@ def _best_tree_mapping_candidate(
         child = ordered[index]
 
         def after_child(child_prefix: tuple[tuple, ...]) -> None:
-            next_prefix = child_prefix + (_join_preference_key(selected_joins[child], side_ranks[child]),)
+            next_prefix = child_prefix + (join_preference_key(child),)
             if not prefix_is_worse(next_prefix):
                 visit_ordered_children(ordered, index + 1, next_prefix, continuation)
 
@@ -969,7 +1051,6 @@ def _best_tree_mapping_candidate(
         # per combination of the siblings before it. Each mapping is proved on
         # the first combination that reaches it and the result is reused for
         # the rest of this visit, which is scoped to one selected[node].
-        proved_joins: dict[int, dict[int, tuple[FusionJoin, int] | None]] = {}
         # Two of the four citation-order criteria ask only about a child's own
         # spec, which nothing in this search varies, so they are settled once
         # per visit rather than rebuilt for every element of every leaf sort.
@@ -982,7 +1063,6 @@ def _best_tree_mapping_candidate(
         }
 
         def select_direct_child(position: int) -> None:
-            nonlocal visited_states
             if position == len(child_ids):
                 ordered = tuple(
                     sorted(
@@ -990,7 +1070,7 @@ def _best_tree_mapping_candidate(
                         key=lambda child: (
                             spec_order_keys[child][0],
                             side_ranks[child],
-                            _attached_locant_key(selected_joins[child]),
+                            attached_key(selected_joins[child]),
                             spec_order_keys[child][1],
                         ),
                     )
@@ -1000,16 +1080,10 @@ def _best_tree_mapping_candidate(
 
             child = child_ids[position]
             interface = interface_by_pair[frozenset((child, node))]
-            proved = proved_joins.setdefault(child, {})
-            for index, mapping in enumerate(projected[child]):
-                visited_states += 1
-                if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
-                    raise _LocantMapBudgetExceeded(
-                        f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
-                    )
-                if index in proved:
-                    classified = proved[index]
-                else:
+            for mapping in projected[child]:
+                cache_key = (child, node, id(mapping), id(selected[node]))
+                classified = classified_join_cache.get(cache_key, _INTERFACE_NOT_CACHED)
+                if classified is _INTERFACE_NOT_CACHED:
                     classified = _classified_join(
                         mapping,
                         selected[node],
@@ -1020,7 +1094,7 @@ def _best_tree_mapping_candidate(
                         mol,
                         host_projection,
                     )
-                    proved[index] = classified
+                    classified_join_cache[cache_key] = classified
                 if classified is None:
                     continue
                 join, side_rank = classified
@@ -1232,6 +1306,7 @@ def _compatible_mapping_assignments(
     projected_mapping_sets = _deduplicate_interface_equivalent_maps(
         mapping_sets,
         interface_by_pair.values(),
+        mol,
     )
     occurrence_order = tuple(
         sorted(range(len(mapping_sets)), key=lambda occurrence: (order_by_occurrence[occurrence], occurrence))
@@ -1244,15 +1319,8 @@ def _compatible_mapping_assignments(
     assignments: list[tuple[tuple[FusionComponentMatch, ...], Mapping[int, tuple[FusionJoin, int]]]] = []
     selected: dict[int, FusionComponentMatch] = {}
     classified: dict[int, tuple[FusionJoin, int]] = {}
-    visited_states = 0
 
     def visit(position: int) -> None:
-        nonlocal visited_states
-        visited_states += 1
-        if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
-            raise _LocantMapBudgetExceeded(
-                f"compatible locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}"
-            )
         if position == len(occurrence_order):
             assignments.append(
                 (
@@ -1300,6 +1368,7 @@ def _compatible_mapping_assignments(
 def _deduplicate_interface_equivalent_maps(
     mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
     interfaces: Iterable[FusionInterface[int]],
+    mol: Molecule,
 ) -> tuple[tuple[FusionComponentMatch, ...], ...]:
     """Keep one full map for each distinct assignment at fusion interfaces."""
 
@@ -1308,16 +1377,135 @@ def _deduplicate_interface_equivalent_maps(
         interface_atoms[interface.left].update(interface.shared_atom_ids)
         interface_atoms[interface.right].update(interface.shared_atom_ids)
 
+    target_atoms = frozenset(
+        atom for mappings in mapping_sets for mapping in mappings for _, atom in mapping.local_to_input_atom
+    )
+    ranks = _interior_component_order_ranks(mol, target_atoms)
     result = []
     for occurrence, mappings in enumerate(mapping_sets):
         relevant_atoms = interface_atoms[occurrence]
         by_projection: dict[tuple[tuple[int, str], ...], FusionComponentMatch] = {}
         for mapping in mappings:
             locant_by_atom = {atom: locant for locant, atom in mapping.local_to_input_atom}
-            projection = tuple((atom, locant_by_atom[atom]) for atom in sorted(relevant_atoms))
+            projection = tuple(
+                sorted(((ranks[atom] if ranks is not None else atom), locant_by_atom[atom]) for atom in relevant_atoms)
+            )
             by_projection.setdefault(projection, mapping)
         result.append(tuple(by_projection[key] for key in sorted(by_projection)))
     return tuple(result)
+
+
+def _mapping_candidate_score(
+    matches: Sequence[FusionComponentMatch],
+    specs: Mapping[int, FusionComponentSpec],
+    topology: _CitationTopology,
+    interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
+    mol: Molecule,
+    supported_joins: frozenset[str],
+    enforce_interoperability_limits: bool,
+    classified_primary: Mapping[int, tuple[FusionJoin, int]],
+    normalized_join_cache: dict[tuple[int, int, int], FusionJoin],
+    closing_validity_cache: dict[tuple[frozenset[int], int, int], bool],
+    attachment_key_cache: dict[tuple[int, int, int], tuple],
+) -> tuple | None:
+    """Evaluate one complete mapping without constructing its citation AST.
+
+    Cyclic covers can have a large Cartesian product of component-local
+    numberings.  Their preference is determined by primary joins and the
+    citation tree; closing joins only have to be valid.  Evaluate exactly those
+    structural facts for every assignment and let ``_build_candidate`` allocate
+    the full immutable citation objects only for the preferred assignment.
+    """
+
+    match_by_id = {match.occurrence_id: match for match in matches}
+    if enforce_interoperability_limits and any(
+        len(match_by_id[occurrence].covered_face_ids) > _SUPPORT.maximum_multiparent_interparent_faces
+        for occurrence in topology.interparent_occurrences
+    ):
+        return None
+
+    primary_joins: dict[int, FusionJoin] = {}
+    side_rank: dict[int, int] = {}
+    for child in topology.parent_by_child:
+        join_data = classified_primary.get(child)
+        if join_data is None:
+            return None
+        join, side_rank[child] = join_data
+        order = topology.order_by_occurrence[child]
+        if order > 1:
+            if "higher_order" not in supported_joins:
+                return None
+            cache_key = (child, id(join.interface), order)
+            normalized = normalized_join_cache.get(cache_key)
+            if normalized is None:
+                normalized = replace(
+                    join,
+                    interface=replace(
+                        join.interface,
+                        kind=FusionJoinKind.HIGHER_ORDER,
+                        host_sides=(),
+                        host_locants=join.interface.host_path,
+                    ),
+                )
+                normalized_join_cache[cache_key] = normalized
+            join = normalized
+        primary_joins[child] = join
+
+    # Closing interfaces do not participate in the preference key, but every
+    # one must be expressible for the mapping to be a candidate.
+    for pair in (*topology.interparent_pairs, *topology.cycle_closing_pairs):
+        attached, host = _closing_join_direction(
+            pair,
+            topology.roots,
+            topology.order_by_occurrence,
+            specs,
+        )
+        cache_key = (pair, id(match_by_id[attached]), id(match_by_id[host]))
+        valid = closing_validity_cache.get(cache_key)
+        if valid is None:
+            valid = (
+                classify_ordered_fusion_interface(
+                    match_by_id[attached],
+                    match_by_id[host],
+                    specs[attached],
+                    specs[host],
+                    interface_by_pair[pair],
+                    mol,
+                )
+                is not None
+            )
+            closing_validity_cache[cache_key] = valid
+        if not valid:
+            return None
+
+    child_order = _ordered_children(topology.parent_by_child, specs, primary_joins, side_rank)
+    _prime_depths, groups = _multiplicative_groups(
+        child_order,
+        specs,
+        primary_joins,
+        attachment_key_cache=attachment_key_cache,
+    )
+    if len(topology.roots) > 1:
+        groups = ()
+    roots = tuple(_build_citation_tree(root, child_order) for root in topology.roots)
+    if enforce_interoperability_limits and len(roots) == 1 and not _tree_citation_scope_supported(roots[0], groups):
+        return None
+    citation_children = tuple(occurrence for root in roots for occurrence in _preorder_children(root))
+    exact_location_key = replace(
+        topology.location_key,
+        multiplicative_grouping_score=tuple(
+            -len(group.occurrence_ids)
+            for group in sorted(groups, key=lambda group: (-len(group.occurrence_ids), group.occurrence_ids))
+        ),
+    )
+    return (
+        component_spec_seniority_key(specs[topology.roots[0]]).as_tuple(),
+        exact_location_key,
+        len(matches),
+        max(topology.order_by_occurrence.values(), default=0),
+        tuple(_join_preference_key(primary_joins[child], side_rank[child]) for child in citation_children),
+        tuple(component_spec_seniority_key(specs[child]).as_tuple() for child in citation_children),
+    )
 
 
 def _build_candidate(
@@ -1333,6 +1521,11 @@ def _build_candidate(
     classified_primary: Mapping[int, tuple[FusionJoin, int]] | None = None,
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
+    if enforce_interoperability_limits and any(
+        len(match_by_id[occurrence].covered_face_ids) > _SUPPORT.maximum_multiparent_interparent_faces
+        for occurrence in topology.interparent_occurrences
+    ):
+        return None
     primary_joins: dict[int, FusionJoin] = {}
     interparent_joins: list[FusionJoin] = []
     cycle_closing_joins: list[FusionJoin] = []
@@ -1748,6 +1941,8 @@ def _multiplicative_groups(
     child_order: Mapping[int, tuple[int, ...]],
     specs: Mapping[int, FusionComponentSpec],
     joins: Mapping[int, FusionJoin],
+    *,
+    attachment_key_cache: dict[tuple[int, int, int], tuple] | None = None,
 ) -> tuple[dict[int, int], tuple[FusionMultiplicityGroup, ...]]:
     prime_depths: dict[int, int] = defaultdict(int)
     groups: list[FusionMultiplicityGroup] = []
@@ -1756,7 +1951,12 @@ def _multiplicative_groups(
         for child in children:
             if child not in child_order:
                 join = joins[child]
-                pattern = multiplicative_attachment_key(specs[child], join)
+                cache_key = (child, id(join.interface), join.order)
+                pattern = None if attachment_key_cache is None else attachment_key_cache.get(cache_key)
+                if pattern is None:
+                    pattern = multiplicative_attachment_key(specs[child], join)
+                    if attachment_key_cache is not None:
+                        attachment_key_cache[cache_key] = pattern
                 by_pattern[pattern].append(child)
         for _pattern, members in sorted(by_pattern.items()):
             if len(members) < 2:
@@ -1872,17 +2072,32 @@ def _attached_locant_key(join: FusionJoin) -> tuple:
     return tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants)
 
 
-def _local_map_key(mapping: tuple[tuple[str, int], ...]) -> tuple:
-    return tuple((retained_locant_sort_key(locant), atom) for locant, atom in mapping)
+def _interior_component_order_ranks(mol: Molecule, atom_ids: frozenset[int]) -> Mapping[int, int] | None:
+    """Use structural ordering only where multiple interior atoms can tie."""
+
+    bounded = cached_bounded_face_model(mol, atom_ids)
+    return canonical_ranks(mol) if bounded is not None and len(bounded.interior_atoms) > 1 else None
 
 
-def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
+def _local_map_key(mapping: tuple[tuple[str, int], ...], ranks: Mapping[int, int] | None) -> tuple:
+    """Order component embeddings by molecular invariants, never atom ids."""
+
+    return tuple(
+        (retained_locant_sort_key(locant), ranks[atom] if ranks is not None else atom) for locant, atom in mapping
+    )
+
+
+def _occurrence_option_key(option: _OccurrenceOption, ranks: Mapping[int, int] | None) -> tuple:
+    atom_key = (lambda atom: ranks[atom]) if ranks is not None else (lambda atom: atom)
     return (
-        min(option.face_ids),
-        -len(option.face_ids),
-        tuple(sorted(option.face_ids)),
+        *(
+            (-len(option.face_ids),)
+            if ranks is not None
+            else (min(option.face_ids), -len(option.face_ids), tuple(sorted(option.face_ids)))
+        ),
         option.mappings[0].template_name,
-        tuple(sorted(option.atom_ids)),
+        tuple(sorted(atom_key(atom) for atom in option.atom_ids)),
+        _local_map_key(option.mappings[0].local_to_input_atom, ranks),
     )
 
 

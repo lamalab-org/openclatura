@@ -6,7 +6,8 @@ from openclatura import name_smiles, opsin_available, verify_with_opsin
 
 # The prefixes -SC#N, -OC#N, -N=C=S and -N=C=O express one bond from the linking
 # atom. A four-coordinate S, an oxonium O or an iminium N has more, and those
-# neighbours were left out of the name (lamalab-org/openclatura#131).
+# neighbours were left out of the name (lamalab-org/openclatura#131). Charged
+# acyclic O/S centres are the senior onium parent, with cyano as a ligand.
 CASES = {
     "CC(=O)NS1(CCCC1)C#N": "N-(1-cyanothiolan-1-yl)acetamide",
     "N#CS1(C)CCCC1": "1-methylthiolane-1-carbonitrile",

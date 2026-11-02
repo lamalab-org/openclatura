@@ -4,6 +4,7 @@ from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import (
     RING_SHAPE_TEMPLATES,
     LayoutSearchBudgetExceeded,
+    _Budget,
     _orientation_score,
     _positive_half_units,
     _ring_axis_center,
@@ -215,3 +216,12 @@ def test_layout_search_budget_exhaustion_is_explicit():
 def test_completed_layout_limit_never_returns_a_partial_preference_set():
     with pytest.raises(LayoutSearchBudgetExceeded, match="completed layouts"):
         intrinsic_fused_layouts(_fused_faces(6), max_layouts=1)
+
+
+def test_default_layout_search_has_no_state_budget():
+    budget = _Budget(None)
+
+    for _ in range(25001):
+        budget.spend()
+
+    assert budget.used == 25001

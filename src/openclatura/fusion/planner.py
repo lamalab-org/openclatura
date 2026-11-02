@@ -31,8 +31,10 @@ from .indicated_hydrogen import (
 )
 from .layout import (
     LayoutSearchBudgetExceeded,
+    OpsinConstructionLayout,
     can_use_component_entry_layout,
     component_entry_layouts,
+    opsin_construction_atom_order,
     preferred_intrinsic_layouts,
 )
 from .mancude import (
@@ -65,6 +67,7 @@ from .numbering import (
     completed_system_numbering_selection,
     indicated_hydrogen_candidate_atoms,
     observed_parent_matches_bond_model,
+    opsin_construction_compatibility,
     parent_bond_model,
 )
 from .registry import FusionComponentRegistry, fusion_component_registry
@@ -73,7 +76,6 @@ from .valence import fusion_lambda_descriptors
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
 SUPPORT = fusion_nomenclature_config().rules.support
-MAXIMUM_NAME_CANDIDATES = fusion_nomenclature_config().search.maximum_name_candidates
 
 # Preserve the planner-level test/extension seam while sharing face proofs
 # between ordinary and P-25.5 planning.
@@ -99,7 +101,11 @@ def plan_fusion_parent(
     return result
 
 
-def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> FusionPlanningResult:
+def _plan_uncached(
+    mol: Molecule,
+    atoms: frozenset[int],
+    mode: FusionMode,
+) -> FusionPlanningResult:
     if not fusion_mode_allows_planning(mode):
         return FusionNotApplicable(f"fusion mode {mode.value!r} does not enable systematic planning")
     if len(atoms) < 6:
@@ -158,23 +164,34 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
 
     rejected = []
     numbering_cache: dict[bool, CompletedNumberingSelection] = {}
+    parser_sensitive_numbering = any(
+        mol.atoms[atom].symbol != "C"
+        or not mol.atoms[atom].is_aromatic
+        or any(neighbor not in atoms for neighbor in mol.get_neighbors(atom))
+        for atom in atoms
+    )
+    parent_edges = frozenset(
+        tuple(sorted((bond.u, bond.v))) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
+    )
     try:
-        # Ranked candidates are emitted in nomenclatural preference order, so a
-        # supported decomposition is proven almost immediately or not at all.
-        # Past that the walk is only enumerating ways to fail, each paying for a
-        # full numbering and reconstruction audit, and the parent falls back to
-        # the same non-fusion name either way.
-        for index, ast in enumerate(iter_fusion_name_asts(mol, matches, registry)):
-            if index >= MAXIMUM_NAME_CANDIDATES:
-                rejected.append(
-                    FusionUnsupported(
-                        "ranked fusion candidates exhausted the audited candidate budget",
-                        (f"stopped after {MAXIMUM_NAME_CANDIDATES} ranked fusion-name candidates",),
-                    )
-                )
-                break
+        for ast in iter_fusion_name_asts(
+            mol,
+            matches,
+            registry,
+            required_parent_atom_ids=atoms,
+            required_parent_edges=parent_edges,
+        ):
             result = _plan_numbered_candidate(
-                mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
+                mol,
+                atoms,
+                mode,
+                ast,
+                registry,
+                bounded,
+                face_model,
+                layouts,
+                numbering_cache=numbering_cache,
+                require_parser_compatible_numbering=parser_sensitive_numbering,
             )
             if isinstance(result, FusionConfirmed):
                 return result
@@ -198,6 +215,50 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     return FusionUnsupported("no supported audited fusion-component decomposition")
 
 
+def _has_multiplied_nonhexagonal_host(
+    ast: FusionNameAst,
+    face_model: FaceModel,
+    registry: FusionComponentRegistry,
+) -> bool:
+    """Identify multiplied-prefix constructions not modeled reliably by OPSIN.
+
+    OPSIN incorporates copies of a multiplied component sequentially. On a
+    nonhexagonal host, three or more implicit carbocyclic copies, or copies at
+    third and higher fusion order, can change the host perceived after an
+    earlier fusion. The citation remains chemically valid, but it is not an
+    interoperability witness for the graph OPSIN will construct. This check
+    depends only on component topology, never on component names or rendered
+    text.
+    """
+
+    if not ast.multiplicative_groups:
+        return False
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    face_size = {face.id: face.size for face in face_model.faces}
+    for group in ast.multiplicative_groups:
+        members = set(group.occurrence_ids)
+        multiplied_specs = tuple(registry.spec_for_match(matches[member]) for member in members)
+        if not all(
+            len(spec.rings) == 1 and len(spec.atoms) == 6 and all(atom.symbol == "C" for atom in spec.atoms)
+            for spec in multiplied_specs
+        ):
+            continue
+        hosts = {join.host_occurrence for join in ast.joins if join.attached_occurrence in members}
+        if len(hosts) != 1:
+            return True
+        host = matches.get(next(iter(hosts)))
+        if host is None:
+            return True
+        if len(host.covered_face_ids) != 1:
+            continue
+        group_joins = tuple(join for join in ast.joins if join.attached_occurrence in members)
+        if face_size.get(next(iter(host.covered_face_ids))) != 6 and (
+            len(members) >= 3 or any(join.order >= 3 for join in group_joins)
+        ):
+            return True
+    return False
+
+
 def _plan_numbered_candidate(
     mol: Molecule,
     atoms: frozenset[int],
@@ -209,6 +270,7 @@ def _plan_numbered_candidate(
     layouts: tuple[FusedLayout, ...] | Callable[[], tuple[FusedLayout, ...] | FusionUnsupported],
     *,
     numbering_cache: dict[bool, CompletedNumberingSelection] | None = None,
+    require_parser_compatible_numbering: bool = True,
 ) -> FusionPlanningResult:
     """Keep chemistry local to each numbering, sharing topology discovery."""
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
@@ -236,6 +298,22 @@ def _plan_numbered_candidate(
         return FusionUnsupported("component hydrogen assignment search budget exhausted", (str(exc),))
     except ValueError as exc:
         return FusionAuditFailed("component hydrogen constraints are inconsistent", (str(exc),))
+    if require_parser_compatible_numbering and _has_multiplied_nonhexagonal_host(ast, face_model, registry):
+        return FusionUnsupported(
+            "OPSIN construction of multiplied components on a nonhexagonal host is not uniquely proven"
+        )
+    if require_parser_compatible_numbering and not any(
+        isinstance(layout, OpsinConstructionLayout) for layout in layouts
+    ):
+        for join in ast.joins:
+            spec = specs[join.attached_occurrence]
+            if (
+                join.order >= 3
+                and len(spec.rings) == 1
+                and len(spec.atoms) == 6
+                and all(atom.symbol == "C" for atom in spec.atoms)
+            ):
+                return FusionUnsupported("third-order carbocyclic fusion requires a parser construction layout witness")
     numbering_selection = numbering_cache.get(prove_carbon_h) if numbering_cache is not None else None
     if numbering_selection is None:
         numbering_selection = completed_system_numbering_selection(
@@ -247,9 +325,18 @@ def _plan_numbered_candidate(
         )
         if numbering_cache is not None:
             numbering_cache[prove_carbon_h] = numbering_selection
-    numberings = numbering_selection.accepted
+    # Construction-backed layouts carry an independent witness for the atom
+    # order used by the supported OPSIN release. A rule-correct completed
+    # numbering that OPSIN assigns to different atoms cannot safely be emitted:
+    # keep searching equivalent fusion decompositions (or another parent
+    # nomenclature) instead of returning a name with parser-dependent locants.
+    numberings = tuple(
+        candidate
+        for candidate in numbering_selection.accepted
+        if not require_parser_compatible_numbering or candidate.opsin_compatible is not False
+    )
     if not numberings:
-        return FusionUnsupported("no layout-derived peripheral system numbering was proven")
+        return FusionUnsupported("no parser-compatible layout-derived system numbering was proven")
     if len(numberings) > 1 and not numbered_parent_graphs_agree(
         mol, (dict(candidate.atom_to_locant) for candidate in numberings)
     ):
@@ -272,6 +359,7 @@ def _plan_numbered_candidate(
     except ValueError as exc:
         return FusionAuditFailed("fusion component constraints are inconsistent", (str(exc),))
     alternatives = []
+    construction_order = opsin_construction_atom_order(ast, specs)
     for candidate in numberings:
         if candidate.layout_index is None:
             return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
@@ -283,6 +371,12 @@ def _plan_numbered_candidate(
             abstract_atom_to_locant=candidate.atom_to_locant,
             input_locant_maps=(candidate.atom_to_locant,),
             rejected_numberings=numbering_selection.rejected,
+            citation_opsin_compatible=opsin_construction_compatibility(
+                mol,
+                bounded,
+                candidate,
+                construction_order,
+            ),
         )
         result = _complete_fusion_plan(
             mol, atoms, mode, ast, registry, proof, graph=graph, initial_bond_model=initial_model

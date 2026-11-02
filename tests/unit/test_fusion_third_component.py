@@ -110,7 +110,7 @@ def test_carbon_surrogate_owns_its_valence_hydrogens():
     assert not _corresponding_carbon_graph_is_exact(mol, carbon, atoms, (0, 1))
 
 
-def test_cactus_component_cover_uses_the_same_replacement_parent_route():
+def test_cactus_component_cover_rejects_parser_incompatible_numbering():
     mol = _cactus_third_component_graph()
 
     plan = plan_third_component_fusion_parent(
@@ -119,15 +119,10 @@ def test_cactus_component_cover_uses_the_same_replacement_parent_route():
         mode=FusionMode.GENERAL,
     )
 
-    assert plan is not None
-    assert plan.cover_topology == "cactus"
-    assert plan.ring_sizes == (5, 5, 5, 5, 5)
-    assert plan.parent.is_skeletal_replacement_fusion
-    assert plan.parent.audit_ok
-    assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 2
+    assert plan is None
 
 
-def test_cactus_cover_with_a_pendant_component_uses_the_same_proof_route():
+def test_cactus_cover_with_a_pendant_component_rejects_parser_incompatible_numbering():
     mol = _cactus_with_pendant_face()
 
     plan = plan_third_component_fusion_parent(
@@ -136,12 +131,7 @@ def test_cactus_cover_with_a_pendant_component_uses_the_same_proof_route():
         mode=FusionMode.GENERAL,
     )
 
-    assert plan is not None
-    assert plan.cover_topology == "cactus"
-    assert plan.ring_sizes == (5, 5, 5, 5, 5, 5)
-    assert plan.parent.is_skeletal_replacement_fusion
-    assert plan.parent.audit_ok
-    assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 2
+    assert plan is None
 
 
 def test_third_component_planning_is_cached_even_when_not_applicable(monkeypatch):
