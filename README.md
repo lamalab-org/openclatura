@@ -390,3 +390,7 @@ If you are using OPSIN for verification, please cite the original OPSIN publicat
   url     = {https://doi.org/10.1021/ci100384d}
 }
 ```
+
+## Funding :moneybag:
+
+This work was funded by the Carl-Zeiss Foundation, the Helmholtz Association within the framework of the Helmholtz Foundation Model Initiative (project SOL-AI).
