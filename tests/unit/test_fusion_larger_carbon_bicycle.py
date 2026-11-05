@@ -88,9 +88,9 @@ def test_large_carbon_extension_rejects_other_topologies(kind):
     assert face_search.select_bounded_face_model(mol, mol.atoms) is None
 
 
-def test_global_cycle_and_shape_bounds_remain_unchanged():
+def test_ordinary_cycle_range_is_derived_from_explicit_shapes():
     config = fusion_nomenclature_config()
-    assert config.search.maximum_ring_size == 8
+    assert not hasattr(config.search, "maximum_ring_size")
     assert config.annulene_ring_sizes == tuple(range(7, 21))
     assert max(shape.ring_size for shape in config.ring_shapes) == 8
     with pytest.raises(ValueError, match="max_size"):

@@ -698,6 +698,7 @@ class FusedLayout:
     orientation_score: tuple[int, ...] = ()
     audit_evidence: tuple[str, ...] = ()
     component_entry_edge: tuple[int, int] | None = None
+    general_planar_proof: bool = False
 
     def __post_init__(self) -> None:
         face_ids = [face for face, _, _ in self.face_positions]

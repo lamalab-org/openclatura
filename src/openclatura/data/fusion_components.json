@@ -27,8 +27,7 @@
     }
   },
   "search_limits": {
-    "minimum_ring_size": 3,
-    "maximum_ring_size": 8
+    "minimum_ring_size": 3
   },
   "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [

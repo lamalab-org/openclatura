@@ -591,6 +591,9 @@ def _fusion_result_metadata(decisions, *extra_sources) -> dict[str, str | None]:
     """
 
     fallback = None
+    fusion_fallback = None
+    assembled_fusion = None
+    fusion_metadata: dict[str, dict[str, str | None]] = {}
     for phase, data in _iter_decision_data([*(decisions or ()), *extra_sources]):
         nomenclature = data.get("parent_nomenclature")
         if not nomenclature:
@@ -602,10 +605,24 @@ def _fusion_result_metadata(decisions, *extra_sources) -> dict[str, str | None]:
             "proof_source": data.get("proof_source"),
         }
         if nomenclature in _FUSION_NOMENCLATURES:
-            return projected
+            # Assembly records the parent that actually contributed the
+            # rendered name. Parent selection may legitimately investigate a
+            # complete-system fusion candidate before a higher-precedence
+            # wrapper replaces it, so an earlier exploratory proof is not the
+            # public result metadata.
+            known = fusion_metadata.setdefault(nomenclature, projected.copy())
+            for key, value in projected.items():
+                if value is not None:
+                    known[key] = value
+            if phase == TracePhase.ASSEMBLY and assembled_fusion is None:
+                assembled_fusion = nomenclature
+            if fusion_fallback is None:
+                fusion_fallback = projected
         if fallback is None and phase == TracePhase.PARENT_SELECTION:
             fallback = projected
-    return fallback or {}
+    if assembled_fusion is not None:
+        return fusion_metadata[assembled_fusion]
+    return fusion_fallback or fallback or {}
 
 
 # --- multiprocessing helpers ---------------------------------------------

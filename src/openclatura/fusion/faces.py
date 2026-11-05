@@ -28,6 +28,7 @@ from .config import fusion_nomenclature_config
 from .model import Face, FaceModel
 
 _CONFIG = fusion_nomenclature_config()
+_MAX_EXPLICIT_RING_SIZE = max(shape.ring_size for shape in _CONFIG.ring_shapes)
 
 Edge = tuple[int, int]
 
@@ -144,21 +145,20 @@ def enumerate_chordless_cycles(
     atom_ids: Iterable[int] | None = None,
     *,
     min_size: int = _CONFIG.search.minimum_ring_size,
-    max_size: int = _CONFIG.search.maximum_ring_size,
+    max_size: int = _MAX_EXPLICIT_RING_SIZE,
     search_budget: int | None = None,
 ) -> tuple[GraphCycle, ...]:
     """Enumerate chordless cycles deterministically, with an optional budget.
 
-    ``min_size`` and ``max_size`` are intentionally constrained to the first
-    production range, 3 through 8.  An explicitly supplied exhausted budget
-    raises instead of exposing a partial cycle set that could be mistaken for
-    a proof.
+    ``min_size`` and ``max_size`` are constrained to sizes with explicit shape
+    vocabulary. An explicitly supplied exhausted budget raises instead of
+    exposing a partial cycle set that could be mistaken for a proof.
     """
 
-    if not _CONFIG.search.minimum_ring_size <= min_size <= max_size <= _CONFIG.search.maximum_ring_size:
+    if not _CONFIG.search.minimum_ring_size <= min_size <= max_size <= _MAX_EXPLICIT_RING_SIZE:
         raise ValueError(
             f"cycle sizes must satisfy {_CONFIG.search.minimum_ring_size} <= min_size <= "
-            f"max_size <= {_CONFIG.search.maximum_ring_size}"
+            f"max_size <= {_MAX_EXPLICIT_RING_SIZE}"
         )
     if search_budget is not None and search_budget < 1:
         raise ValueError("search_budget must be positive")
@@ -278,7 +278,7 @@ def select_bounded_face_model(
         mol,
         atoms,
         min_size=min_ring_size,
-        max_size=_CONFIG.search.maximum_ring_size if max_ring_size is None else max_ring_size,
+        max_size=_MAX_EXPLICIT_RING_SIZE if max_ring_size is None else max_ring_size,
         search_budget=cycle_search_budget,
     )
     if rank > 2 and min_ring_size == _CONFIG.search.minimum_ring_size and max_ring_size is None:
@@ -339,7 +339,7 @@ def _complete_large_carbon_faces(
         _enumerate_from_start(
             start,
             adjacency,
-            _CONFIG.search.maximum_ring_size + 1,
+            _MAX_EXPLICIT_RING_SIZE + 1,
             max(_CONFIG.annulene_ring_sizes),
             budget,
             found,
@@ -384,7 +384,7 @@ def _larger_carbon_bicycle(mol: Molecule, atoms: frozenset[int], edges: frozense
         seen != atoms
         or len(paths) != 2
         or max(sizes) not in _CONFIG.annulene_ring_sizes
-        or max(sizes) <= _CONFIG.search.maximum_ring_size
+        or max(sizes) <= _MAX_EXPLICIT_RING_SIZE
         or min(sizes) < _CONFIG.rules.minimum_ring_size
     ):
         return None

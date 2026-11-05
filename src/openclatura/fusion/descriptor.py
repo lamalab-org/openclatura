@@ -1062,6 +1062,81 @@ def _best_tree_mapping_candidate(
             for child in child_ids
         }
 
+        mapping_options = {child: projected[child] for child in child_ids}
+        if not topology.cycle_closing_pairs and not topology.interparent_pairs:
+            terminal_groups: dict[tuple, list[int]] = defaultdict(list)
+            for child in child_ids:
+                if not children.get(child):
+                    terminal_groups[component_variant_identity(specs[child])].append(child)
+            for siblings in terminal_groups.values():
+                classified_options: dict[int, list[tuple[FusionComponentMatch, FusionJoin, int, tuple]]] = {}
+                for child in siblings:
+                    interface = interface_by_pair[frozenset((child, node))]
+                    options = []
+                    for mapping in projected[child]:
+                        cache_key = (child, node, id(mapping), id(selected[node]))
+                        classified = classified_join_cache.get(cache_key, _INTERFACE_NOT_CACHED)
+                        if classified is _INTERFACE_NOT_CACHED:
+                            classified = _classified_join(
+                                mapping,
+                                selected[node],
+                                specs[child],
+                                specs[node],
+                                interface,
+                                topology.order_by_occurrence[child],
+                                mol,
+                                host_projection,
+                            )
+                            classified_join_cache[cache_key] = classified
+                        if classified is not None:
+                            join, side_rank = classified
+                            options.append(
+                                (mapping, join, side_rank, multiplicative_attachment_key(specs[child], join))
+                            )
+                    classified_options[child] = options
+                if len(siblings) == 1:
+                    child = siblings[0]
+                    if classified_options[child]:
+                        best_key = min(
+                            (side_rank, attached_key(join))
+                            for _mapping, join, side_rank, _pattern in classified_options[child]
+                        )
+                        mapping_options[child] = tuple(
+                            mapping
+                            for mapping, join, side_rank, _pattern in classified_options[child]
+                            if (side_rank, attached_key(join)) == best_key
+                        )
+                    continue
+                common_patterns = set.intersection(
+                    *(set(option[3] for option in classified_options[child]) for child in siblings)
+                )
+                if not common_patterns:
+                    continue
+                pattern_keys = {}
+                for pattern in common_patterns:
+                    pattern_keys[pattern] = tuple(
+                        sorted(
+                            min(
+                                (side_rank, attached_key(join))
+                                for _mapping, join, side_rank, candidate_pattern in classified_options[child]
+                                if candidate_pattern == pattern
+                            )
+                            for child in siblings
+                        )
+                    )
+                best_pattern = min(pattern_keys, key=lambda pattern: pattern_keys[pattern])
+                for child in siblings:
+                    best_key = min(
+                        (side_rank, attached_key(join))
+                        for _mapping, join, side_rank, pattern in classified_options[child]
+                        if pattern == best_pattern
+                    )
+                    mapping_options[child] = tuple(
+                        mapping
+                        for mapping, join, side_rank, pattern in classified_options[child]
+                        if pattern == best_pattern and (side_rank, attached_key(join)) == best_key
+                    )
+
         def select_direct_child(position: int) -> None:
             if position == len(child_ids):
                 ordered = tuple(
@@ -1080,7 +1155,7 @@ def _best_tree_mapping_candidate(
 
             child = child_ids[position]
             interface = interface_by_pair[frozenset((child, node))]
-            for mapping in projected[child]:
+            for mapping in mapping_options[child]:
                 cache_key = (child, node, id(mapping), id(selected[node]))
                 classified = classified_join_cache.get(cache_key, _INTERFACE_NOT_CACHED)
                 if classified is _INTERFACE_NOT_CACHED:
