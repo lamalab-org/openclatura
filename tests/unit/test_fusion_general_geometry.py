@@ -78,3 +78,25 @@ def test_large_multiport_geometry_is_invariant_to_atom_identifiers(ring_size, po
 
     assert first and second
     assert _geometry_signatures(first) == _geometry_signatures(second)
+
+
+def test_general_planar_proof_covers_two_port_geometry_without_a_template():
+    _mol, model = _multiport_system(9, (0, 4))
+
+    layouts = intrinsic_fused_layouts(model)
+
+    assert layouts
+    assert all("exact barycentric interior embedding" in layout.audit_evidence for layout in layouts)
+    assert all("complete original face geometry audited" in layout.audit_evidence for layout in layouts)
+
+
+def test_general_planar_proof_is_invariant_to_atom_identifiers():
+    first_mol, first_model = _multiport_system(9, (0, 4))
+    arbitrary_ids = tuple(2000 + 41 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_model = _multiport_system(9, (0, 4), atom_ids=arbitrary_ids)
+
+    first = intrinsic_fused_layouts(first_model)
+    second = intrinsic_fused_layouts(second_model)
+
+    assert first and second
+    assert _geometry_signatures(first) == _geometry_signatures(second)

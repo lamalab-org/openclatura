@@ -420,6 +420,19 @@ def resolve_parent_hydride_plan(
             decision_trace=decision_trace,
         )
         if fusion_parent is not None:
+            # The general embedding proves that more complete graphs can be
+            # drawn as fused systems, including graphs whose established
+            # architecture is a nondetachable bridge over a fused parent.
+            # Reconsider bridge precedence only for those newly admitted
+            # candidates; template-proven fusion keeps the original fast path.
+            if fusion_parent.fusion_plan.numbering.selected_layout.general_planar_proof:
+                bridged_parent = resolve_bridged_fusion_parent(
+                    mol,
+                    selection,
+                    decision_trace=decision_trace,
+                )
+                if bridged_parent is not None:
+                    return bridged_parent
             return fusion_parent
         third_component_parent = resolve_third_component_fusion_parent(
             mol,

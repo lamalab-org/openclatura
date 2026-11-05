@@ -43,7 +43,6 @@ _IMPLEMENTED_JOIN_KINDS = ("ortho", "ortho_peri", "higher_order")
 @dataclass(frozen=True, slots=True)
 class FusionSearchLimits:
     minimum_ring_size: int
-    maximum_ring_size: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +66,8 @@ class RingShapeSpec:
     entry_component_size: int = 0
 
     def __post_init__(self) -> None:
-        if not 3 <= self.ring_size <= 8:
-            raise ValueError("intrinsic ring shapes support sizes 3 through 8")
+        if self.ring_size < 3:
+            raise ValueError("intrinsic ring shapes require at least three vertices")
         if len(self.vertices) != self.ring_size or len(set(self.vertices)) != self.ring_size:
             raise ValueError("ring shape vertices must uniquely cover the declared ring size")
         if len(self.edge_directions) != self.ring_size:
@@ -188,8 +187,6 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     search = FusionSearchLimits(
         **{field: _positive_int(limits_data, field) for field in FusionSearchLimits.__dataclass_fields__}
     )
-    if search.minimum_ring_size > search.maximum_ring_size:
-        raise ValueError("fusion minimum ring size must not exceed the maximum")
     rows = data.get("ring_shapes")
     if not isinstance(rows, list) or not rows:
         raise ValueError("fusion ring_shapes must be a non-empty list")

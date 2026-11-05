@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass, fields, replace
+from fractions import Fraction
 from functools import lru_cache
-from math import gcd, lcm
+from math import atan2, gcd, lcm
 
 from ..locants import system_locant_sort_key
 from .config import RingShapeSpec, fusion_nomenclature_config
@@ -264,7 +265,7 @@ _SHAPES_BY_SIZE = {
     size: tuple(
         shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == size and shape.directed_entry_port is None
     )
-    for size in range(_CONFIG.search.minimum_ring_size, _CONFIG.search.maximum_ring_size + 1)
+    for size in sorted({shape.ring_size for shape in RING_SHAPE_TEMPLATES})
 }
 
 
@@ -611,21 +612,15 @@ def intrinsic_fused_layouts(
         raise ValueError("layout search budget and result limit must be positive")
     if opsin_ring_map and not _opsin_ring_map_tree(model):
         return ()
-    terminal = _terminal_ring_proxy_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
-    if terminal is not None:
-        return terminal
-    if len(model.faces) > 2:
-        for face in model.faces:
-            if face.size in {7, 8}:
-                angular = _two_port_large_ring_layouts(
-                    model, search_budget=search_budget, max_layouts=max_layouts, face_id=face.id
-                )
-                if angular:
-                    return angular
+    topology_proof = _topology_geometry_proof(
+        model,
+        search_budget=search_budget,
+        max_layouts=max_layouts,
+    )
+    if topology_proof is not None:
+        return topology_proof
     if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
-        if len(model.faces) == 2:
-            return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
-        return _two_port_large_ring_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+        return ()
     face_by_id = {face.id: face for face in model.faces}
     if not _valid_face_adjacency(model, face_by_id):
         return ()
@@ -672,6 +667,154 @@ def intrinsic_fused_layouts(
     return tuple(sorted(completed.values(), key=_layout_sort_key))
 
 
+def _topology_geometry_proof(
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None
+) -> tuple[FusedLayout, ...] | None:
+    """Try geometry witnesses by graph signature, independent of ring size."""
+
+    for provider in (_terminal_ring_proxy_layouts, _fusion_port_proxy_layouts):
+        layouts = provider(model, search_budget=search_budget, max_layouts=max_layouts)
+        if layouts:
+            return layouts
+    if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
+        layouts = _ordinary_large_bicycle_layouts(
+            model,
+            search_budget=search_budget,
+            max_layouts=max_layouts,
+        )
+        if layouts:
+            return layouts
+    for face in model.faces:
+        if face.size in _SHAPES_BY_SIZE and not (len(model.faces) > 2 and face.size in {7, 8}):
+            continue
+        layouts = _two_port_large_ring_layouts(
+            model,
+            search_budget=search_budget,
+            max_layouts=max_layouts,
+            face_id=face.id,
+        )
+        if layouts:
+            return layouts
+    if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
+        return _planar_face_model_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    return None
+
+
+def _solve_barycentric_positions(
+    model: FaceModel,
+    boundary_positions: dict[int, Point],
+) -> dict[int, Point] | None:
+    """Embed interior vertices by the exact barycentric planar equations."""
+
+    graph: dict[int, set[int]] = defaultdict(set)
+    for face in model.faces:
+        for left, right in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1]):
+            graph[left].add(right)
+            graph[right].add(left)
+    interior = tuple(sorted(set(graph) - set(boundary_positions)))
+    if not interior:
+        return dict(boundary_positions)
+    index = {atom: position for position, atom in enumerate(interior)}
+    rows = []
+    for atom in interior:
+        row = [Fraction(0) for _ in interior]
+        row[index[atom]] = Fraction(len(graph[atom]))
+        right_x = right_y = Fraction(0)
+        for neighbor in graph[atom]:
+            if neighbor in index:
+                row[index[neighbor]] -= 1
+            else:
+                point = boundary_positions.get(neighbor)
+                if point is None:
+                    return None
+                right_x += point[0]
+                right_y += point[1]
+        rows.append([*row, right_x, right_y])
+
+    size = len(interior)
+    for column in range(size):
+        pivot = next((row for row in range(column, size) if rows[row][column]), None)
+        if pivot is None:
+            return None
+        rows[column], rows[pivot] = rows[pivot], rows[column]
+        divisor = rows[column][column]
+        rows[column] = [value / divisor for value in rows[column]]
+        for row in range(size):
+            if row == column or not rows[row][column]:
+                continue
+            factor = rows[row][column]
+            rows[row] = [value - factor * pivot_value for value, pivot_value in zip(rows[row], rows[column])]
+
+    rational = {atom: (rows[index[atom]][size], rows[index[atom]][size + 1]) for atom in interior}
+    rational.update({atom: (Fraction(x), Fraction(y)) for atom, (x, y) in boundary_positions.items()})
+    scale = lcm(*(coordinate.denominator for point in rational.values() for coordinate in point))
+    return {atom: (int(x * scale), int(y * scale)) for atom, (x, y) in rational.items()}
+
+
+def _planar_face_model_layouts(
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None
+) -> tuple[FusedLayout, ...]:
+    """Construct one exact geometry proof from the audited plane embedding.
+
+    The outer boundary is strictly convex and every interior atom is the exact
+    barycentre of its neighbours.  The resulting drawing is accepted only by
+    the same complete edge, crossing, overlap, and perimeter audit as template
+    layouts.  This is the size- and port-count-independent support fallback.
+    """
+
+    face_by_id = {face.id: face for face in model.faces}
+    if not model.outer_boundary or not _valid_face_adjacency(model, face_by_id):
+        return ()
+    shape = _canonical_convex_shape(len(model.outer_boundary))
+    budget = _Budget(search_budget)
+    adjacent = frozenset(frozenset((left, right)) for left, right, _edge in model.face_adjacency)
+    completed: dict[tuple[tuple[int, int, int], ...], FusedLayout] = {}
+    for offset in range(len(model.outer_boundary)):
+        for reverse in (False, True):
+            budget.spend()
+            boundary = _oriented_cycle(model.outer_boundary, offset, reverse)
+            positions = _solve_barycentric_positions(
+                model,
+                {atom: point for atom, point in zip(boundary, shape.vertices)},
+            )
+            orders = {face.id: face.atom_cycle for face in model.faces}
+            if positions is None or not _audit_layout(model, orders, positions):
+                continue
+            center_scale = lcm(*(face.size for face in model.faces))
+            centers = {
+                face.id: (
+                    sum(positions[atom][0] for atom in face.atom_cycle) * center_scale // face.size,
+                    sum(positions[atom][1] for atom in face.atom_cycle) * center_scale // face.size,
+                )
+                for face in model.faces
+            }
+            positions = {atom: (x * center_scale, y * center_scale) for atom, (x, y) in positions.items()}
+            positions, centers = _normalize_integer_layout(positions, centers)
+            key = tuple((atom, *point) for atom, point in sorted(positions.items()))
+            completed[key] = FusedLayout(
+                face_positions=tuple((face, *point) for face, point in sorted(centers.items())),
+                atom_positions=key,
+                face_shapes=tuple((face.id, f"planar-proof-{face.size}") for face in model.faces),
+                orientation_score=_orientation_score(
+                    centers,
+                    {},
+                    adjacent,
+                    distortion=1,
+                    orders=orders,
+                    positions=positions,
+                ),
+                audit_evidence=(
+                    "strictly convex outer boundary",
+                    "exact barycentric interior embedding",
+                    "complete original face geometry audited",
+                ),
+                general_planar_proof=True,
+            )
+            if max_layouts is not None and len(completed) > max_layouts:
+                raise LayoutSearchBudgetExceeded(max_layouts, resource="layouts")
+    return tuple(sorted(completed.values(), key=_layout_sort_key))
+
+
 def _terminal_ring_proxy_layouts(
     model: FaceModel, *, search_budget: int | None, max_layouts: int | None
 ) -> tuple[FusedLayout, ...] | None:
@@ -685,7 +828,9 @@ def _terminal_ring_proxy_layouts(
     if len(model.faces) < 3 or len(model.face_adjacency) != len(model.faces) - 1:
         return None
     targets = [
-        face for face in model.faces if face.size in {7, 8} and len(set(face.edge_cycle) & model.fusion_edges) == 1
+        face
+        for face in model.faces
+        if face.size in _CONFIG.annulene_ring_sizes and len(set(face.edge_cycle) & model.fusion_edges) == 1
     ]
     if not targets:
         return None
@@ -731,9 +876,170 @@ def _terminal_ring_proxy_layouts(
     )
 
 
+def _fusion_port_proxy_layouts(
+    model: FaceModel, *, search_budget: int | None, max_layouts: int | None
+) -> tuple[FusedLayout, ...] | None:
+    """Prove large multi-port faces through their exact fusion-port skeleton.
+
+    Every fusion edge and endpoint is retained.  Only internal atoms of paths
+    containing no fusion edge are contracted, so the proxy has exactly the
+    same face adjacency and port order as the original graph.  Expansion is
+    accepted only when the complete original geometry passes the usual audit.
+    """
+
+    targets = []
+    for face in model.faces:
+        if face.size in _SHAPES_BY_SIZE:
+            continue
+        ports = set(face.edge_cycle) & model.fusion_edges
+        anchors = {atom for edge in ports for atom in (_edge_endpoints(face, edge) or ())}
+        if len(ports) >= 3:
+            targets.append((face, anchors))
+    if not targets:
+        return None
+    if not _valid_face_adjacency(model, {face.id: face for face in model.faces}):
+        return ()
+
+    faces = {face.id: face for face in model.faces}
+    paths: list[tuple[int, ...]] = []
+    removed: set[int] = set()
+    next_edge = max(edge for face in model.faces for edge in face.edge_cycle) + 1
+    for face, anchors in targets:
+        order = face.atom_cycle
+        anchor_indices = tuple(index for index, atom in enumerate(order) if atom in anchors)
+        if len(anchor_indices) not in _SHAPES_BY_SIZE:
+            if len(targets) != 1:
+                return ()
+            return _convex_large_face_layouts(
+                model,
+                face,
+                search_budget=search_budget,
+                max_layouts=max_layouts,
+            )
+        proxy_atoms = tuple(order[index] for index in anchor_indices)
+        original_edges = {
+            frozenset((left, right)): edge for left, right, edge in zip(order, order[1:] + order[:1], face.edge_cycle)
+        }
+        proxy_edges = []
+        for position, start in enumerate(anchor_indices):
+            stop = anchor_indices[(position + 1) % len(anchor_indices)]
+            indices = []
+            current = start
+            while True:
+                indices.append(current)
+                if current == stop and len(indices) > 1:
+                    break
+                current = (current + 1) % face.size
+            path = tuple(order[index] for index in indices)
+            paths.append(path)
+            removed.update(path[1:-1])
+            edge = original_edges.get(frozenset((path[0], path[-1])))
+            if edge is None:
+                edge = next_edge
+                next_edge += 1
+            proxy_edges.append(edge)
+        if removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
+            return ()
+        faces[face.id] = Face(face.id, proxy_atoms, tuple(proxy_edges), len(proxy_atoms))
+
+    proxy = _subdivided_face_model(model, tuple(faces.values()), removed)
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    return _expand_proxy_layouts(
+        model,
+        layouts,
+        tuple(paths),
+        {face.id: f"fusion-port-skeleton-{face.size}:" for face, _anchors in targets},
+        (
+            "all fusion ports retained in cyclic order",
+            "only nonfusion paths contracted into the topology proxy",
+            "complete original face geometry audited",
+        ),
+        general_planar_proof=True,
+    )
+
+
+def _canonical_convex_shape(size: int) -> RingShapeSpec:
+    """Return an exact integer convex polygon with a canonical entrance edge."""
+
+    if size % 2 == 0:
+        half = size // 2
+        vectors = [(4, 0), *((half - index, index) for index in range(1, half))]
+        vectors += [(-x, -y) for x, y in vectors]
+    else:
+        pairs = (size - 3) // 2
+        vectors = [(4, 0), (-2, 3), (-2, -3)]
+        upper = [(pairs + 2 - index, index) for index in range(1, pairs + 1)]
+        vectors += [*upper, *((-x, -y) for x, y in upper)]
+    vectors.sort(key=lambda vector: atan2(vector[1], vector[0]) % (2 * 3.141592653589793))
+    points = []
+    x = y = 0
+    for dx, dy in vectors:
+        points.append((x, y))
+        x += dx
+        y += dy
+    if (x, y) != (0, 0) or points[:2] != [(0, 0), (4, 0)]:
+        raise ValueError("canonical convex fusion shape did not close")
+    return RingShapeSpec(
+        ring_size=size,
+        shape_id=f"topology-convex-{size}",
+        vertices=tuple(points),
+        edge_directions=tuple(range(size)),
+        horizontal_axis_class="edge",
+        distortion_rank=1,
+    )
+
+
+def _convex_large_face_layouts(
+    model: FaceModel,
+    root: Face,
+    *,
+    search_budget: int | None,
+    max_layouts: int | None,
+) -> tuple[FusedLayout, ...]:
+    """Search from an exact convex witness when a port skeleton exceeds eight vertices."""
+
+    face_by_id = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, face_by_id):
+        return ()
+    shape = _canonical_convex_shape(root.size)
+    budget = _Budget(search_budget)
+    completed: dict[tuple, FusedLayout] = {}
+    materialized_embeddings: set[tuple] = set()
+    best_distortion: list[int | None] = [None]
+    for offset in range(root.size):
+        for reverse in (False, True):
+            budget.spend()
+            order = _oriented_cycle(root.atom_cycle, offset, reverse)
+            _search_layouts(
+                model,
+                face_by_id,
+                {root.id: order},
+                {root.id: shape},
+                {atom: point for atom, point in zip(order, shape.vertices)},
+                budget,
+                completed,
+                materialized_embeddings,
+                max_layouts,
+                "cartesian",
+                best_distortion,
+            )
+    return tuple(
+        replace(
+            layout,
+            audit_evidence=(
+                *layout.audit_evidence,
+                "all fusion ports embedded on one exact convex boundary",
+                "complete original face geometry audited",
+            ),
+            general_planar_proof=True,
+        )
+        for layout in sorted(completed.values(), key=_layout_sort_key)
+    )
+
+
 def _two_port_large_ring_layouts(
     model: FaceModel, *, search_budget: int | None, max_layouts: int | None, face_id: int | None = None
-) -> tuple[FusedLayout, ...]:
+) -> tuple[FusedLayout, ...] | None:
     """Expand a hexagon direction witness into one two-port ring.
 
     OPSIN's even-ring direction rule assigns distances n/2 - 1 and n/2 + 1
@@ -762,11 +1068,11 @@ def _two_port_large_ring_layouts(
         or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
         or set(model.outer_boundary) != {atom for face in model.faces for atom in face.atom_cycle}
     ):
-        return ()
+        return None
     face = large[0]
     ports = set(face.edge_cycle) & model.fusion_edges
     if len(ports) != 2:
-        return ()
+        return None
     entrance = _edge_endpoints(face, min(ports))
     if entrance is None:
         return ()
@@ -870,6 +1176,8 @@ def _expand_proxy_layouts(
     paths: tuple[tuple[int, ...], ...],
     shape_prefixes: dict[int, str],
     evidence: tuple[str, ...],
+    *,
+    general_planar_proof: bool = False,
 ) -> tuple[FusedLayout, ...]:
     """Restore the original graph while retaining the audited proxy axes."""
 
@@ -898,6 +1206,7 @@ def _expand_proxy_layouts(
                     "only nonfusion paths subdivided; proxy polygon and ring-axis centers preserved",
                     "expanded original face model passes the complete geometry audit",
                 ),
+                general_planar_proof=general_planar_proof,
             )
         )
     return tuple(sorted(expanded, key=_layout_sort_key))
@@ -905,7 +1214,7 @@ def _expand_proxy_layouts(
 
 def _ordinary_large_bicycle_layouts(
     model: FaceModel, *, search_budget: int | None, max_layouts: int | None
-) -> tuple[FusedLayout, ...]:
+) -> tuple[FusedLayout, ...] | None:
     """Embed one edge-fused pair, without extending the general shape search.
 
     A vertical common edge and two symmetric convex arcs prove a horizontal
@@ -915,14 +1224,15 @@ def _ordinary_large_bicycle_layouts(
     """
 
     if (
-        len(model.faces) != 2
+        all(face.size in _SHAPES_BY_SIZE for face in model.faces)
+        or len(model.faces) != 2
         or len(model.fusion_edges) != 1
         or len(model.face_adjacency) != 1
         or max(face.size for face in model.faces) not in _CONFIG.annulene_ring_sizes
         or min(face.size for face in model.faces) < _CONFIG.rules.minimum_ring_size
         or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
     ):
-        return ()
+        return None
     left, right = model.faces
     edge = next(iter(model.fusion_edges))
     endpoints = _edge_endpoints(left, edge)

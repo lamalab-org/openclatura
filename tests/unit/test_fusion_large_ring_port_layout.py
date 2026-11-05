@@ -149,11 +149,14 @@ def test_reduction_is_generic_over_even_sizes_and_short_ring_tree_extensions(siz
 
 
 @pytest.mark.parametrize("size,distance", [(11, 4), (12, 1), (12, 2), (12, 4), (12, 6)])
-def test_unproved_large_ring_direction_signatures_still_abstain(size, distance):
+def test_other_large_ring_direction_signatures_use_the_general_planar_proof(size, distance):
     mol = _angular_case(size, distance)
     bounded = select_bounded_face_model(mol, mol.atoms)
     assert bounded is not None
-    assert intrinsic_fused_layouts(typed_face_model(mol, bounded)) == ()
+    layouts = intrinsic_fused_layouts(typed_face_model(mol, bounded))
+    assert layouts
+    assert all("exact barycentric interior embedding" in layout.audit_evidence for layout in layouts)
+    assert all("complete original face geometry audited" in layout.audit_evidence for layout in layouts)
 
 
 @pytest.mark.parametrize("limits", [{"search_budget": 1}, {"max_layouts": 1}])
