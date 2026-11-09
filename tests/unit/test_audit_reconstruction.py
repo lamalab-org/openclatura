@@ -1143,7 +1143,7 @@ def _corpus_smiles() -> list[str]:
         return []
     import csv
 
-    with corpus.open() as handle:
+    with corpus.open(encoding="utf-8") as handle:
         return [row["smiles"] for row in csv.DictReader(handle)]
 
 
