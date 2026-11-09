@@ -27,7 +27,7 @@ GOLDEN = ROOT / "tests/fixtures/diverse_corpus.golden.json"
 
 def main() -> int:
     rows = []
-    with CORPUS.open() as fh:
+    with CORPUS.open(encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
             smiles = row["smiles"].strip()
             if not smiles:
