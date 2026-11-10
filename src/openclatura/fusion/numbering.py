@@ -1095,6 +1095,60 @@ def _locant_key(locant: SystemLocant) -> tuple[int, str, int]:
 def _maximum_matchings(
     edges: frozenset[tuple[int, int]], *, search_budget: int | None
 ) -> tuple[frozenset[tuple[int, int]], ...]:
+    """Return every maximum matching, sorted, using memoized residual vertex states.
+
+    The result is a property of the graph, but the number of residual states
+    the search visits depends on the vertex numbering: branching on the
+    lowest-numbered vertex can split the residual graph into fragments whose
+    combinations are all distinct states, each held in the memo. Without a
+    budget the search therefore runs on a breadth-first renumbering, whose
+    residual graphs stay compact, and its matchings are numbered back and
+    sorted. With a budget, the state count decides whether it is exceeded, so
+    the search keeps the input numbering.
+    """
+
+    if search_budget is not None:
+        return _maximum_matchings_in_order(edges, search_budget=search_budget)
+    order = _breadth_first_vertex_order(edges)
+    label = {atom: index for index, atom in enumerate(order)}
+    relabeled = frozenset(normalize_edge(label[left], label[right]) for left, right in edges)
+    matchings = (
+        frozenset(normalize_edge(order[left], order[right]) for left, right in matching)
+        for matching in _maximum_matchings_in_order(relabeled, search_budget=None)
+    )
+    return tuple(sorted(matchings, key=lambda matching: tuple(sorted(matching))))
+
+
+def _breadth_first_vertex_order(edges: frozenset[tuple[int, int]]) -> list[int]:
+    """Order vertices breadth-first (Cuthill-McKee): from a vertex of least degree, neighbours by degree."""
+
+    neighbors: dict[int, list[int]] = {}
+    for left, right in edges:
+        neighbors.setdefault(left, []).append(right)
+        neighbors.setdefault(right, []).append(left)
+
+    def by_degree(atom: int) -> tuple[int, int]:
+        return len(neighbors[atom]), atom
+
+    placed: set[int] = set()
+    order: list[int] = []
+    for start in sorted(neighbors, key=by_degree):
+        if start in placed:
+            continue
+        placed.add(start)
+        queue = deque((start,))
+        while queue:
+            atom = queue.popleft()
+            order.append(atom)
+            following = sorted((neighbor for neighbor in neighbors[atom] if neighbor not in placed), key=by_degree)
+            placed.update(following)
+            queue.extend(following)
+    return order
+
+
+def _maximum_matchings_in_order(
+    edges: frozenset[tuple[int, int]], *, search_budget: int | None
+) -> tuple[frozenset[tuple[int, int]], ...]:
     """Return every maximum matching using memoized residual vertex states.
 
     Branching on edges revisits the same residual graph many times, which is
