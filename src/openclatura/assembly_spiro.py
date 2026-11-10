@@ -730,7 +730,16 @@ def _prime_central_spiro_parts(parts: AssemblyParts, *, keep_name_internals: boo
         else:
             from .name_bindings import refresh_name_atom_bindings
 
+            # The side components have already been split out of
+            # ``parts.substituents``, so the rebuild cannot see them. Carry
+            # their bindings across, with the locants primed like the rest.
+            side_bindings = [
+                replace(binding, locants=tuple(prime(locant) for locant in binding.locants))
+                for binding in parts.name_atom_bindings
+                if binding.role == "spiro_substituent"
+            ]
             refresh_name_atom_bindings(parts)
+            parts.name_atom_bindings.extend(side_bindings)
 
 
 _SIDE_LOCANTS_RE = re.compile(r"^[0-9]+[a-z]*'+(?:,[0-9]+[a-z]*'+)*$")
