@@ -113,6 +113,10 @@ class _Reduction:
     ring_owner: dict[tuple[int, ...], int | None] = field(default_factory=dict)  # Cp ring -> metal
     radical_rings: list[tuple[int, ...]] = field(default_factory=list)
     had_metal_bonds: bool = False
+    # Filled in by perception, for callers that need the atoms and not just the model.
+    centre: int | None = None
+    units: dict[int, list[tuple[int, ...]]] = field(default_factory=dict)  # metallocene metal -> rings
+    inner_groups: list[set[int]] = field(default_factory=list)  # ligands of the centre
 
 
 def contains_transition_metal(smiles: str = "", rdkit_mol=None) -> bool:
@@ -380,12 +384,18 @@ def _claim_metallocenes(state: _Reduction) -> dict[int, list[tuple[int, ...]]]:
 def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
     """Reduce an input containing a transition metal to a complex model or a plain metallocene."""
 
+    return _perceive(smiles, rdkit_mol)[0]
+
+
+def _perceive(smiles: str = "", rdkit_mol=None) -> tuple[MetalRoute, _Reduction]:
+    """:func:`perceive`, also returning the detached molecule the model was read from."""
+
     from rdkit import Chem
 
     mol = rdkit_mol if rdkit_mol is not None else _parse(smiles)
     state = _detach_metals(mol)
     rw = state.mol
-    units = _claim_metallocenes(state)
+    units = state.units = _claim_metallocenes(state)
     centres = [metal for metal in state.metals if metal not in units]
 
     # Whether the input itself bonds ligands to the centre; without that, every
@@ -401,6 +411,13 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
         state.radical_rings = []
     if state.radical_rings:
         raise UnsupportedMetalError("could not assign every cyclopentadienyl ring to a metal")
+    if len(centres) == 1:
+        # A cyclopentadienide left without a metal is the centre's ligand, bound
+        # through the ring face, however much of the rest was drawn bonded.
+        for ring, owner in state.ring_owner.items():
+            if owner is None:
+                state.ring_owner[ring] = centres[0]
+                state.donors_of[centres[0]].update(ring)
 
     for metal, donors in state.donors_of.items():
         for donor in donors:
@@ -412,10 +429,10 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
     normalised = Chem.MolToSmiles(rw)
 
     if not centres:
-        return MetalRoute(smiles=normalised)
+        return MetalRoute(smiles=normalised), state
     if len(centres) > 1:
         raise UnsupportedMetalError("more than one metal centre is not supported")
-    centre = centres[0]
+    centre = state.centre = centres[0]
     centre_atom = rw.GetAtomWithIdx(centre)
 
     fragments = [set(fragment) for fragment in Chem.GetMolFrags(rw) if centre not in fragment]
@@ -433,16 +450,48 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
     disconnected = not drawn_bonds[centre]
     inner: dict[tuple[str, int, tuple[str, ...], bool], int] = {}
     outer: list[str] = []
+    members: list[tuple[set[int], str, int, list[int]]] = []  # atoms, SMILES, charge, bound donors
+    spare_anions: list[tuple[set[int], str, int, list[int]]] = []
+    sites = 0
     for group in groups:
         fragment_smiles = Chem.MolFragmentToSmiles(rw, atomsToUse=sorted(group))
         charge = sum(rw.GetAtomWithIdx(idx).GetFormalCharge() for idx in group)
         bound = sorted(group & centre_donors)
-        if not disconnected and not bound and charge != 0:
-            # Unbonded ions are counter-ions; an unbonded neutral molecule beside
-            # a partly drawn centre (PubChem draws Cl-Pd-Cl next to a free
-            # phosphane) is still one of its ligands.
-            outer.append(fragment_smiles)
-            continue
+        entry = (group, fragment_smiles, charge, bound)
+        if bound:
+            rings = [ring for ring in centre_rings if ring <= set(bound)]
+            sites += len(rings) + len(set(bound) - set().union(*rings))
+            members.append(entry)
+        elif charge == 0:
+            # An unbonded neutral molecule is a ligand, also beside a partly
+            # drawn centre (PubChem draws Cl-Pd-Cl next to a free phosphane).
+            sites += _likely_denticity(rw, group)
+            members.append(entry)
+        elif charge > 0 or not disconnected:
+            outer.append(fragment_smiles)  # counter-ions
+        else:
+            spare_anions.append(entry)
+    # Nothing in a fully disconnected drawing says which anions are bound.  They
+    # fill what is left of the usual coordination number, smallest first; the
+    # rest are counter-ions ([Co(NH3)6]Cl3, [Co(NH3)5Cl]Cl2, [Pt(NH3)4]Cl2).
+    room = _usual_coordination_number(centre_atom) - sites
+    # A sphere drawn over-full (Cl3Co beside three free diamines) has its
+    # halides bonded only by the drawing convention: they are the counter-ions.
+    for entry in [entry for entry in members if entry[3] and len(entry[0]) == 1 and entry[2] == -1]:
+        if room >= 0:
+            break
+        if rw.GetAtomWithIdx(entry[3][0]).GetSymbol() in ("F", "Cl", "Br", "I"):
+            members.remove(entry)
+            outer.append(entry[1])
+            room += 1
+    for entry in sorted(spare_anions, key=lambda item: (len(item[0]), item[1])):
+        if room > 0:
+            members.append(entry)
+            room -= 1
+        else:
+            outer.append(entry[1])
+    for group, fragment_smiles, charge, bound in members:
+        state.inner_groups.append(group)
         hapto = any(ring <= set(bound) for ring in centre_rings)
         donors = () if hapto else tuple(sorted(rw.GetAtomWithIdx(idx).GetSymbol() for idx in bound))
         key = (Chem.CanonSmiles(fragment_smiles), charge, donors, hapto)
@@ -459,7 +508,7 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
         Ligand(smiles=smiles_, charge=charge, count=count, donors=donors, hapto=hapto)
         for (smiles_, charge, donors, hapto), count in inner.items()
     )
-    return MetalRoute(
+    route = MetalRoute(
         smiles=normalised,
         complex=Complex(
             metal=centre_atom.GetSymbol(),
@@ -468,6 +517,36 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
             other_components=".".join(sorted(outer)),
         ),
     )
+    return route, state
+
+
+# Centres that are four- or two-coordinate as a rule; everything else is taken as six.
+_USUAL_COORDINATION_NUMBER = {
+    ("Cu", 2): 4,
+    ("Zn", 2): 4,
+    ("Pd", 2): 4,
+    ("Pt", 2): 4,
+    ("Au", 3): 4,
+    ("Rh", 1): 4,
+    ("Ir", 1): 4,
+    ("Ag", 1): 2,
+    ("Au", 1): 2,
+}
+
+
+def _usual_coordination_number(metal_atom) -> int:
+    return _USUAL_COORDINATION_NUMBER.get((metal_atom.GetSymbol(), metal_atom.GetFormalCharge()), 6)
+
+
+def _likely_denticity(rw, group: set[int]) -> int:
+    """Sites an unattached neutral ligand probably takes: one per uncharged nitrogen or phosphorus."""
+
+    donors = sum(
+        1
+        for idx in group
+        if rw.GetAtomWithIdx(idx).GetSymbol() in ("N", "P") and rw.GetAtomWithIdx(idx).GetFormalCharge() == 0
+    )
+    return max(donors, 1)
 
 
 def _heavy_atoms(smiles: str) -> int:

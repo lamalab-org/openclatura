@@ -170,6 +170,25 @@ try:  # molfile input arrived with coordination naming; older releases lack it
 except ImportError:
     _name_molblock = None
 
+try:  # the assembled picture of a complex is newer still
+    from openclatura.coordination_depict import depict_complex_svg as _depict_complex_svg  # noqa: E402
+except ImportError:
+    _depict_complex_svg = None
+
+
+def _add_complex_picture(payload: dict, smiles: str | None, molblock: str | None = None) -> dict:
+    """Attach the assembled drawing of a coordination compound, when the input is one."""
+    if _depict_complex_svg is None or not payload.get("name"):
+        return payload
+    try:
+        svg = _depict_complex_svg(smiles or "", molblock=molblock or "")
+    except Exception:
+        svg = None
+    if svg:
+        payload["complex_svg"] = svg
+    return payload
+
+
 app = FastAPI()
 
 # ---------------------------------------------------------------------------
@@ -554,7 +573,8 @@ def name_endpoint(req: NameRequest) -> dict:
                 )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return dataclasses.replace(result, smiles=req.smiles).to_dict(include_trace=req.include_trace)
+        payload = dataclasses.replace(result, smiles=req.smiles).to_dict(include_trace=req.include_trace)
+        return _add_complex_picture(payload, req.smiles, req.molblock)
     flags = f"t{int(req.include_trace)}v{int(req.verify_opsin)}s{int(want_self)}d{int(req.token_debug)}"
     key = _cache_key("name", req.smiles, flags)
     cached = _cache_get(key)
@@ -586,7 +606,7 @@ def name_endpoint(req: NameRequest) -> dict:
                     )
                     if result.opsin_check is None or result.opsin_check.status != "error":
                         break
-    payload = result.to_dict(include_trace=req.include_trace)
+    payload = _add_complex_picture(result.to_dict(include_trace=req.include_trace), req.smiles)
     if _name_cacheable(payload, req.verify_opsin):
         if req.no_cache:
             _count_uncached("name")

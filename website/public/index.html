@@ -307,6 +307,15 @@
     padding: .2rem .7rem;
     margin: .1rem 0 .35rem;
   }
+  .complex-depict {
+    display: none;
+    background: #fff; color: #111; /* drawn like a printed structure, in both themes */
+    border: 1px solid var(--border);
+    padding: .4rem;
+    margin: .6rem 0 0;
+  }
+  .complex-depict.shown { display: block; }
+  .complex-depict svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
   .verify-badge.ok { display: block; background: #e6f6ee; color: #0e7a4d; }
   .verify-badge.bad { display: block; background: var(--err-soft); color: var(--err); }
   .verify-badge.warn { display: block; background: var(--chip); color: var(--muted); }
@@ -395,6 +404,7 @@
     <h2>IUPAC name</h2>
     <div id="result-name" class="placeholder">Draw a structure to name it.</div>
     <div class="verify-badge" id="verify-badge"></div>
+    <div class="complex-depict" id="complex-depict" title="The complex as perceived, redrawn. Sites are spread evenly; geometry is not implied."></div>
     <div class="status" id="status"></div>
     <div class="errbox" id="errbox"></div>
     <div class="chips" id="rules"></div>
@@ -556,6 +566,7 @@
     el("result-name").textContent = placeholder;
     el("result-name").className = "placeholder";
     el("verify-badge").className = "verify-badge";
+    renderComplex("");
     el("rules").innerHTML = "";
     el("errbox").style.display = "none";
     el("explain").style.display = "none";
@@ -699,6 +710,7 @@
       el("result-name").textContent = "Could not name this structure.";
       el("result-name").className = "error";
       el("verify-badge").className = "verify-badge";
+      renderComplex("");
       el("rules").innerHTML = "";
       el("btn-copy").disabled = true;
       el("btn-explain").disabled = true;
@@ -750,6 +762,7 @@
           el("btn-copy").disabled = false;
           el("btn-explain").disabled = false;
           renderOpsin(data.opsin_check);
+          renderComplex(data.complex_svg);
           var chips = el("rules");
           chips.innerHTML = "";
           var hints = (data.rule_hints || []).join("\n");
@@ -775,6 +788,13 @@
         setStatus("");
         scheduleFailure(seq, e.message);
       });
+  }
+
+  // The API's own SVG of a coordination compound, assembled around its metal.
+  function renderComplex(svg) {
+    var box = el("complex-depict");
+    box.innerHTML = svg || "";
+    box.className = svg ? "complex-depict shown" : "complex-depict";
   }
 
   function renderOpsin(check) {
