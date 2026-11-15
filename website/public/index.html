@@ -753,6 +753,14 @@
       badge.className = "verify-badge ok";
       badge.textContent = "✓ OPSIN round-trip: structure matched";
       badge.title = "OPSIN parsed the name back to " + (check.opsin_smiles || "");
+    } else if (check.status === "matched_composition") {
+      // A coordination name OPSIN cannot read whole: the ligands and the metal
+      // were read back separately, so this confirms what is in the complex but
+      // not which atoms bind the metal.
+      badge.className = "verify-badge ok";
+      badge.textContent = "✓ Composition matched: metal, ligands and counts";
+      badge.title = "OPSIN read the ligand names; the complex was reassembled as " +
+                    (check.opsin_smiles || "") + ". Donor atoms and geometry are not checked.";
     } else if (check.status === "mismatched") {
       badge.className = "verify-badge bad";
       badge.textContent = "✗ OPSIN round-trip: structure mismatch";

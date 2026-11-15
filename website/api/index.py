@@ -453,6 +453,15 @@ def _opsin_check_via_daemon(name: str, smiles: str):
 
     if not name:
         return OpsinCheck(status="name_empty", name=name)
+    try:
+        from openclatura.coordination import contains_transition_metal
+    except ImportError:  # a release without coordination naming
+        contains_transition_metal = None
+    if contains_transition_metal is not None and contains_transition_metal(smiles):
+        # Metal complexes are compared against the ligand-detached drawing the
+        # engine derives, and by composition when OPSIN cannot read the name;
+        # only the engine's own verify path does both.
+        return None
     decoded = _OPSIN_DAEMON.parse(name)
     if decoded is None:
         return None
