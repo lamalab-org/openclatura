@@ -1,4 +1,4 @@
-openclatura[web]==0.4.0
+openclatura[web]==0.4.3
 py2opsin>=1.2
 bigsmiles==0.0.10
 setuptools==80.10.2
