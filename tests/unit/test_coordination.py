@@ -96,3 +96,45 @@ def test_unsupported_metal_inputs_fail_loudly(smiles):
 def test_inputs_without_a_transition_metal_are_untouched():
     assert name_smiles("CCO") == "ethanol"
     assert name_smiles("C1CC[Mg]C1") == "1-magnesacyclopentane"
+
+
+# Pd(dppf)Cl2 in the ways it actually gets drawn.
+PD_DPPF_CL2 = "dichloridopalladium(II)"
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        # PubChem: Cl-Pd-Cl drawn, the phosphane and iron left beside it.
+        (
+            "Cl[Pd]Cl.[Fe].[CH]1[CH][CH][C]([CH]1)P(c2ccccc2)c3ccccc3.[CH]4[CH][CH][C]([CH]4)P(c5ccccc5)c6ccccc6",
+            "[1,1'-bis(diphenylphosphanyl)ferrocene]" + PD_DPPF_CL2,
+        ),
+        # Dative P->Pd.
+        (
+            "Cl[Pd](Cl)(<-P(c1ccccc1)(c1ccccc1)[c-]1cccc1)<-P(c1ccccc1)(c1ccccc1)[c-]1cccc1.[Fe+2]",
+            "[1,1'-bis(diphenylphosphanyl)ferrocene-κ2P,P']" + PD_DPPF_CL2,
+        ),
+        # As in a structure diagram: plain lines P-Pd and ten Fe-C bonds.
+        (
+            "Cl[Pd]1(Cl)P(c2ccccc2)(c2ccccc2)C23C4C5C6C2[Fe]34567892C3C7C8C9C32P1(c1ccccc1)c1ccccc1",
+            "[1,1'-bis(diphenylphosphanyl)ferrocene-κ2P,P']" + PD_DPPF_CL2,
+        ),
+    ],
+)
+def test_pd_dppf_dichloride_from_each_drawing(smiles, expected):
+    assert name_smiles(smiles) == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        # A plain line from a donor already at its normal valence is a lone-pair donation.
+        ("CS(C)[Pt](Cl)(Cl)S(C)C", "dichloridobis(dimethylsulfane-κS)platinum(II)"),
+        ("Cl[Pt](Cl)(n1ccccc1)n1ccccc1", "dichloridobis(pyridine-κN)platinum(II)"),
+        # Hydrogens on the metal are hydrido ligands, not dropped.
+        ("[H][Co](C#O)(C#O)(C#O)C#O", "tetracarbonylhydridocobalt(I)"),
+    ],
+)
+def test_plain_bond_donors_and_metal_hydrides(smiles, expected):
+    assert name_smiles(smiles) == expected

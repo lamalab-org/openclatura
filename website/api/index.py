@@ -142,7 +142,7 @@ _ensure_java()
 # on Vercel only /tmp is writable.
 os.chdir(tempfile.gettempdir())
 
-from fastapi import FastAPI, Request, Response  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from fastapi.responses import JSONResponse, PlainTextResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 from rdkit import Chem  # noqa: E402
@@ -164,6 +164,11 @@ from openclatura import describe  # noqa: E402
 from openclatura import describe_human  # noqa: E402
 from openclatura import name as name_one  # noqa: E402
 from openclatura.web.app import create_app  # noqa: E402
+
+try:  # molfile input arrived with coordination naming; older releases lack it
+    from openclatura import name_molblock as _name_molblock  # noqa: E402
+except ImportError:
+    _name_molblock = None
 
 app = FastAPI()
 
@@ -495,6 +500,10 @@ _SELF_AUDIT_AVAILABLE = "verify_self" in inspect.signature(name_one).parameters
 
 class NameRequest(BaseModel):
     smiles: str
+    # The drawing as a molfile, sent alongside the SMILES when it holds bonds
+    # SMILES export loses (dative bonds to a metal). Named in place of the
+    # SMILES where the engine supports it.
+    molblock: str | None = None
     include_trace: bool = False
     verify_opsin: bool = False
     # Rebuild the molecule from its own name using openclatura's grammar and
@@ -531,6 +540,21 @@ def name_endpoint(req: NameRequest) -> dict:
     # requested on the naming call itself — it cannot be bolted on afterwards
     # the way the OPSIN round-trip can.
     self_kwargs = {"verify_self": True} if want_self else {}
+    if req.molblock and _name_molblock is not None:
+        # Not cached: the cache is keyed by SMILES, which is exactly what cannot
+        # tell two drawings with different metal bonding apart.
+        try:
+            with _OPSIN_LOCK:
+                result = _name_molblock(
+                    req.molblock,
+                    include_trace=req.include_trace,
+                    verify_opsin=req.verify_opsin,
+                    token_debug=req.token_debug,
+                    **self_kwargs,
+                )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return dataclasses.replace(result, smiles=req.smiles).to_dict(include_trace=req.include_trace)
     flags = f"t{int(req.include_trace)}v{int(req.verify_opsin)}s{int(want_self)}d{int(req.token_debug)}"
     key = _cache_key("name", req.smiles, flags)
     cached = _cache_get(key)

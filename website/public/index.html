@@ -631,6 +631,23 @@
       .catch(fullSmiles);
   }
 
+  // Ketcher's SMILES export writes a dative bond as an ordinary single bond
+  // (and adds hydrogens to the metal), so a complex drawn with coordination
+  // bonds is sent as a molfile too; the API names that instead of the SMILES.
+  var DATIVE_BOND = 9;
+  var currentKey = "";
+  var currentMolblock = null;
+
+  function dativeBondCount() {
+    var count = 0;
+    try {
+      ketcher.editor.struct().bonds.forEach(function (bond) {
+        if (bond.type === DATIVE_BOND) count += 1;
+      });
+    } catch (e) { /* no struct yet */ }
+    return count;
+  }
+
   function nameCurrent() {
     if (!ketcher) return;
     smilesToName().then(function (result) {
@@ -639,17 +656,32 @@
       el("smiles-out").textContent = smiles || "—";
       if (!smiles) {
         currentSmiles = "";
+        currentKey = "";
+        currentMolblock = null;
         currentName = "";
         updateIssueLink();
         resetResult("Draw a structure to name it.");
         return;
       }
-      if (smiles === currentSmiles && currentName) {
+      var dative = dativeBondCount();
+      var key = smiles + (dative ? "#dative" + dative : "");
+      if (key === currentKey && currentName) {
         setStatus(""); // edit didn't change the structure (moved/selected an atom)
         return;
       }
+      currentKey = key;
       currentSmiles = smiles;
-      requestName(smiles);
+      currentMolblock = null;
+      if (!dative) {
+        requestName(smiles);
+        return;
+      }
+      ketcher.getMolfile("v3000").then(function (molfile) {
+        currentMolblock = molfile;
+        requestName(smiles);
+      }).catch(function () {
+        requestName(smiles);
+      });
     }).catch(function () {
       // Incomplete structures (e.g. mid-drag) can fail SMILES export; ignore.
       setStatus("");
@@ -697,6 +729,7 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         smiles: smiles,
+        molblock: currentMolblock || undefined,
         include_trace: true,
         verify_opsin: verify,
         no_cache: noCache()

@@ -184,6 +184,21 @@ def _detach_metals(mol) -> _Reduction:
     state.had_metal_bonds = bool(records)
 
     hydrogens = {donor: rw.GetAtomWithIdx(donor).GetTotalNumHs() for _, donor, _, _ in records}
+    # A donor drawn with a plain line to the metal while already at its normal
+    # valence (a phosphane P, an amine N, a thioether S) is donating a lone
+    # pair: the line is a dative bond in all but notation.  Counting it as a
+    # shared pair would invent a hydrogen or a charge on the donor.
+    lone_pair_donors: set[int] = set()
+    for _, donor, dative, order in records:
+        atom = rw.GetAtomWithIdx(donor)
+        if dative or atom.GetNoImplicit():
+            continue
+        normal = _isoelectronic_valence(atom.GetAtomicNum(), atom.GetFormalCharge())
+        bonded = int(round(sum(b.GetBondTypeAsDouble() for b in atom.GetBonds())))
+        if normal is not None and bonded + hydrogens[donor] > normal:
+            hydrogens[donor] = max(0, normal - (bonded - order))
+            lone_pair_donors.add(donor)
+    metal_hydrides = {metal: rw.GetAtomWithIdx(metal).GetTotalNumHs() for metal in metals}
     for metal, donor, _, _ in records:
         rw.RemoveBond(metal, donor)
         state.donors_of[metal].add(donor)
@@ -196,6 +211,14 @@ def _detach_metals(mol) -> _Reduction:
         atom.SetNoImplicit(True)
         atom.SetNumExplicitHs(0)
         atom.SetNumRadicalElectrons(0)
+        # Hydrogens written on the metal are hydrido ligands.
+        for _ in range(metal_hydrides[metal]):
+            hydride = Chem.Atom(1)
+            hydride.SetFormalCharge(-1)
+            hydride.SetNoImplicit(True)
+            state.donors_of[metal].add(rw.AddAtom(hydride))
+            atom.SetFormalCharge(atom.GetFormalCharge() + 1)
+        state.had_metal_bonds = state.had_metal_bonds or bool(metal_hydrides[metal])
 
     _settle_cyclopentadienide_rings(state)
     ring_atoms = {idx for ring in state.ring_owner for idx in ring}
@@ -203,7 +226,7 @@ def _detach_metals(mol) -> _Reduction:
     # An ordinary (non-dative) bond to the metal is a shared pair: give it to
     # the donor when the donor would otherwise be short of its valence.
     for metal, donor, dative, _ in records:
-        if dative or donor in ring_atoms:
+        if dative or donor in ring_atoms or donor in lone_pair_donors:
             continue
         atom = rw.GetAtomWithIdx(donor)
         valence = int(round(sum(b.GetBondTypeAsDouble() for b in atom.GetBonds()))) + atom.GetNumExplicitHs()
@@ -414,7 +437,10 @@ def perceive(smiles: str = "", rdkit_mol=None) -> MetalRoute:
         fragment_smiles = Chem.MolFragmentToSmiles(rw, atomsToUse=sorted(group))
         charge = sum(rw.GetAtomWithIdx(idx).GetFormalCharge() for idx in group)
         bound = sorted(group & centre_donors)
-        if not disconnected and not bound:
+        if not disconnected and not bound and charge != 0:
+            # Unbonded ions are counter-ions; an unbonded neutral molecule beside
+            # a partly drawn centre (PubChem draws Cl-Pd-Cl next to a free
+            # phosphane) is still one of its ligands.
             outer.append(fragment_smiles)
             continue
         hapto = any(ring <= set(bound) for ring in centre_rings)
