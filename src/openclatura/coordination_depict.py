@@ -19,11 +19,21 @@ from .coordination import _perceive, contains_transition_metal, read_molblock
 
 _BOND = 1.5  # ligand bond length, as RDKit lays molecules out
 _METAL_BOND = 1.7
-_RING_RADIUS = 1.0
-_RING_SQUASH = 0.34
-_RING_DISTANCE = 1.45
+# A face-bound ring as the textbooks draw it: wide, seen from just above its
+# plane, a corner pointing away from the metal, the near edges heavy.
+_RING_RADIUS = 1.7
+_RING_SQUASH = 0.36
+_RING_DISTANCE = 2.3
+_RING_BOLD = 6.5
 _SCALE = 30.0  # pixels per layout unit
-_FONT = 17.0
+# Proportions after the journal ("ACS Document 1996") drawing settings: lines
+# about 4% of a bond long, bold lines three times that, the second line of a
+# double bond 16% of a bond away, labels in Helvetica.
+_FONT = 20.0
+_LINE = 1.8
+_BOLD = 5.5
+_DOUBLE = 0.16 * _BOND * _SCALE
+_SUBSCRIPT = '<tspan font-size="{size:.1f}" dy="4">{text}</tspan><tspan dy="-4">\u200b</tspan>'
 _DONOR_PREFERENCE = ("P", "N", "S", "O", "Cl", "Br", "I", "F", "C")
 
 Point = tuple[float, float]
@@ -59,6 +69,8 @@ class _Scene:
     pos: dict[int, Point] = field(default_factory=dict)
     link_style: dict[tuple[int, int], str] = field(default_factory=dict)  # "wedge" or "hash"
     link_order: dict[tuple[int, int], int] = field(default_factory=dict)  # 2 for M=O
+    bond_style: dict[tuple[int, int], str] = field(default_factory=dict)  # (narrow end, wide end) -> "wedge" or "hash"
+    cycles: list[tuple[int, ...]] = field(default_factory=list)  # ordinary rings, for the inner line of a double bond
     entity: set[int] = field(default_factory=set)  # the centre and its ligands
     entity_charge: int = 0
 
@@ -156,6 +168,20 @@ def _build_scene(state) -> _Scene:
         carbon, oxygen = sorted(fragment, key=lambda idx: rw.GetAtomWithIdx(idx).GetAtomicNum())
         _remove_atom(scene, oxygen)
         scene.atoms[carbon] = _Atom(symbol="C", tail="O", always_labelled=True)
+
+    three = _SUBSCRIPT.format(size=_FONT * 0.68, text="3")
+    for atom in rw.GetAtoms():
+        idx = atom.GetIdx()
+        if atom.GetAtomicNum() != 6 or atom.GetDegree() != 4 or atom.GetFormalCharge() or idx not in scene.atoms:
+            continue
+        fluorines = [n.GetIdx() for n in atom.GetNeighbors() if n.GetAtomicNum() == 9 and n.GetDegree() == 1]
+        if len(fluorines) != 3 or any(f not in scene.atoms or f in donors for f in fluorines):
+            continue
+        for fluorine in fluorines:
+            _remove_atom(scene, fluorine)
+        scene.atoms[idx] = _Atom(symbol="C", tail="F" + three, always_labelled=True)
+
+    scene.cycles = [tuple(ring) for ring in ring_info.AtomRings() if all(idx in scene.atoms for idx in ring)]
     return scene
 
 
@@ -177,7 +203,7 @@ def _free_coordinates(scene: _Scene, atoms: set[int], donors: tuple[int, ...] = 
     """
 
     from rdkit import Chem
-    from rdkit.Chem import AllChem
+    from rdkit.Chem import rdDepictor
 
     order = sorted(atoms)
     if len(order) == 1 and not donors:
@@ -198,55 +224,155 @@ def _free_coordinates(scene: _Scene, atoms: set[int], donors: tuple[int, ...] = 
         index = {**index, _METAL_KEY: stand_in}
     mol.UpdatePropertyCache(strict=False)
     Chem.FastFindRings(mol)
-    AllChem.Compute2DCoords(mol)
+    # The layout is tuned to RDKit's own coordinates; a host that has switched
+    # the process to CoordGen (the website does) must not change the picture.
+    coordgen = rdDepictor.GetPreferCoordGen()
+    rdDepictor.SetPreferCoordGen(False)
+    try:
+        rdDepictor.Compute2DCoords(mol)
+    finally:
+        rdDepictor.SetPreferCoordGen(coordgen)
     conformer = mol.GetConformer()
     return {idx: (conformer.GetAtomPosition(at).x, conformer.GetAtomPosition(at).y) for idx, at in index.items()}
 
 
+def _crosses(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """Whether segment ``a``-``b`` properly crosses ``c``-``d``."""
+
+    def side(p: Point, q: Point, r: Point) -> float:
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return side(a, b, c) * side(a, b, d) < -1e-9 and side(c, d, a) * side(c, d, b) < -1e-9
+
+
 def _place_ring(scene: _Scene, ring: tuple[int, ...], metal: int, centre: Point, axis: Point, placed: set[int]) -> None:
-    """Draw a face-bound C5 ring in perspective at ``centre`` and hang its substituents off it."""
+    """Draw a face-bound ring in perspective at ``centre`` and hang its substituents off it."""
 
     ring_set = set(ring)
+    size = len(ring)
     view = axis if axis[1] > 1e-6 or (abs(axis[1]) <= 1e-6 and axis[0] > 0) else (-axis[0], -axis[1])
     across = (view[1], -view[0])
-    substituted = [idx for idx in ring if any(n not in ring_set for n in scene.neighbours(idx))]
-    start = ring.index(substituted[0]) if substituted else 0
-    ordered = tuple(ring[(start + offset) % len(ring)] for offset in range(len(ring)))
+    away = 1.0 if axis[0] * view[0] + axis[1] * view[1] > 0 else -1.0  # the back of the ring faces away from the metal
+    branches_of = {idx: [n for n in scene.neighbours(idx) if n not in ring_set] for idx in ring}
+    weight = {idx: sum(len(scene.component(n, ring_set)) for n in branches_of[idx]) for idx in ring}
+
+    turn = away * math.pi / 2  # the first corner points away from the metal
+
+    # Turn the ring so that its substituents sit on the right and on the side
+    # away from the metal, the largest in the best place.
+    def merit(order: tuple[int, ...]) -> float:
+        return sum(
+            weight[idx]
+            * (math.cos(turn + 2 * math.pi * k / size) + 0.6 * away * math.sin(turn + 2 * math.pi * k / size))
+            for k, idx in enumerate(order)
+        )
+
+    first = next((position for position, idx in enumerate(ring) if weight[idx]), 0)
+    orders = [
+        tuple(ring[(first + start + step * offset) % size] for offset in range(size))
+        for start in range(size)
+        for step in (1, -1)
+    ]
+    ordered = max(orders, key=lambda order: round(merit(order), 6))
     mark = _Ring(atoms=ordered, metal=metal)
     angles = {}
     for position, idx in enumerate(ordered):
-        angle = 2 * math.pi * position / len(ordered)
+        angle = turn + 2 * math.pi * position / size
         angles[idx] = angle
         flat, depth = _RING_RADIUS * math.cos(angle), _RING_RADIUS * math.sin(angle)
         scene.pos[idx] = (
             centre[0] + flat * across[0] + _RING_SQUASH * depth * view[0],
             centre[1] + flat * across[1] + _RING_SQUASH * depth * view[1],
         )
-        mark.depth[idx] = depth
+        mark.depth[idx] = math.sin(angle)
     scene.rings.append(mark)
     placed |= ring_set
 
-    for idx in substituted:
-        # Radially out of the ring, leaning away from the metal so that the
-        # substituents of two stacked rings do not meet between them.
-        outward = _normalise(
-            (
-                math.cos(angles[idx]) * across[0] + 0.45 * math.sin(angles[idx]) * view[0] + 0.4 * axis[0],
-                math.cos(angles[idx]) * across[1] + 0.45 * math.sin(angles[idx]) * view[1] + 0.4 * axis[1],
-            )
-        )
-        for neighbour in scene.neighbours(idx):
-            if neighbour in ring_set:
-                continue
+    # Each substituent is a rigid piece.  It points radially out of the ring,
+    # leaning away from the metal; where pieces would run into each other they
+    # are swung aside or turned over until they no longer do.
+    pieces: list[tuple[set[int], list[dict[int, Point]], list[float]]] = []  # atoms, candidate layouts, their cost
+    for idx in ordered:
+        # Radially out of the ring, in the plane the ring is drawn in.
+        flat, deep = math.cos(angles[idx]), 0.6 * math.sin(angles[idx])
+        outward = _normalise((flat * across[0] + deep * view[0], flat * across[1] + deep * view[1]))
+        for neighbour in branches_of[idx]:
             branch = scene.component(neighbour, ring_set)
-            if branch & placed:
+            if branch & placed or any(branch & atoms for atoms, _, _ in pieces):
                 raise _CannotDraw("a ring substituent joins two rings")
             free = _free_coordinates(scene, branch | {idx})
             direction = _normalise((free[neighbour][0] - free[idx][0], free[neighbour][1] - free[idx][1]))
-            moved = _rigid(free, free[idx], direction, outward, scene.pos[idx])
-            for atom in branch:
-                scene.pos[atom] = moved[atom]
-            placed |= branch
+            mirrored = {atom: _reflect(point, free[idx], direction) for atom, point in free.items()}
+            swings = (0.0,) if len(branch) == 1 else (0.0, 25.0, -25.0, 50.0, -50.0, 75.0, -75.0, 100.0, -100.0)
+            layouts, costs = [], []
+            for swing in swings:
+                turn = math.radians(swing)
+                target = (
+                    outward[0] * math.cos(turn) - outward[1] * math.sin(turn),
+                    outward[0] * math.sin(turn) + outward[1] * math.cos(turn),
+                )
+                for source, penalty in ((free, 0.0), (mirrored, 0.05)) if len(branch) > 1 else ((free, 0.0),):
+                    moved = _rigid(source, free[idx], direction, target, scene.pos[idx])
+                    layouts.append({atom: moved[atom] for atom in branch})
+                    costs.append(abs(swing) / 100.0 + penalty)
+            pieces.append((branch | {idx}, layouts, costs))
+
+    def segments(atoms: set[int], where: dict[int, Point]) -> list[tuple[Point, Point]]:
+        return [
+            (where[a], where[b])
+            for a, b in (tuple(pair) for pair in scene.bonds if pair <= atoms)
+            if a in where and b in where
+        ]
+
+    fixed_points = {idx: point for idx, point in scene.pos.items() if idx in placed}
+    fixed_segments = segments(set(fixed_points), fixed_points)
+    metal_at = scene.pos[metal]
+
+    def cost(chosen: list[int], which: int) -> float:
+        atoms, layouts, costs = pieces[which]
+        mine = layouts[chosen[which]]
+        total = costs[chosen[which]]
+        others: dict[int, Point] = dict(fixed_points)
+        other_segments = list(fixed_segments)
+        for position, (other_atoms, other_layouts, _) in enumerate(pieces):
+            if position != which:
+                others.update(other_layouts[chosen[position]])
+                other_segments += segments(other_atoms, {**scene.pos, **other_layouts[chosen[position]]})
+        for atom, point in mine.items():
+            for other, there in others.items():
+                gap = math.dist(point, there)
+                if gap < 1.2 and other not in atoms:
+                    total += 6.0 + 10.0 * (1.2 - gap)
+            # Not into the space between the ring and the metal.
+            inward = (point[0] - centre[0]) * -axis[0] + (point[1] - centre[1]) * -axis[1]
+            if inward > 0.2 and math.dist(point, metal_at) < 4.5:
+                total += 4.0 * inward
+        for one in segments(atoms, {**scene.pos, **mine}):
+            total += 8.0 * sum(_crosses(*one, *other) for other in other_segments)
+        return total
+
+    chosen = [0] * len(pieces)
+    by_size = sorted(range(len(pieces)), key=lambda position: -len(pieces[position][0]))
+    for _ in range(3):
+        for which in by_size:
+            if len(pieces[which][1]) > 1:
+                chosen[which] = min(
+                    range(len(pieces[which][1])),
+                    key=lambda option: cost([*chosen[:which], option, *chosen[which + 1 :]], which),
+                )
+    for (atoms, layouts, _), option in zip(pieces, chosen, strict=True):
+        scene.pos.update(layouts[option])
+        placed |= atoms
+
+
+def _reflect(point: Point, origin: Point, direction: Point | None) -> Point:
+    """Mirror ``point`` in the line through ``origin`` along ``direction``."""
+
+    if direction is None:
+        return point
+    dx, dy = point[0] - origin[0], point[1] - origin[1]
+    along = dx * direction[0] + dy * direction[1]
+    return (origin[0] + 2 * along * direction[0] - dx, origin[1] + 2 * along * direction[1] - dy)
 
 
 def _layout_sandwich(scene: _Scene, metal: int, rings: list[tuple[int, ...]], placed: set[int]) -> set[int]:
@@ -393,6 +519,14 @@ def _layout(state, scene: _Scene) -> None:
             + state.mol.GetAtomWithIdx(centre).GetFormalCharge()
         )
         ligands.sort(key=lambda item: (-len(item[1]), min(item[0])))
+        chelates = [item for item in ligands if len(item[1]) > 1]
+        if not centre_rings and chelates and len(chelates) < len(ligands):
+            # Chelate rings are wide: seat the one-site ligands between them
+            # (two bipyridines opposite each other, not side by side).
+            between: list[list] = [[] for _ in chelates]
+            for position, item in enumerate(item for item in ligands if len(item[1]) == 1):
+                between[position % len(chelates)].append(item)
+            ligands = [item for chelate, gap in zip(chelates, between, strict=True) for item in (chelate, *gap)]
 
         ring_angles, ligand_angles = _site_angles(len(centre_rings), [len(donors) for _, donors in ligands])
         for ring, angle in zip(centre_rings, ring_angles, strict=True):
@@ -400,6 +534,7 @@ def _layout(state, scene: _Scene) -> None:
             _place_ring(scene, ring, centre, (axis[0] * _RING_DISTANCE, axis[1] * _RING_DISTANCE), axis, placed)
 
         crowded = sum(len(donors) for _, donors in ligands) >= 6
+        chelate_rings: list[tuple[set[int], Point]] = []  # atoms, direction away from the metal
         for (atoms, donors), angles in zip(ligands, ligand_angles, strict=True):
             unit_metals = sorted(metal for metal in atoms if metal in state.units)
             if unit_metals:
@@ -428,6 +563,8 @@ def _layout(state, scene: _Scene) -> None:
                     # out, so neighbouring donors do not land on top of each other.
                     shift = _unit(sum(angles) / len(angles))
                     moved = {idx: (x + shift[0] * 0.7, y + shift[1] * 0.7) for idx, (x, y) in moved.items()}
+                if len(donors) > 1:
+                    chelate_rings.append((atoms, _unit(sum(angles) / len(angles))))
                 scene.pos.update(moved)
                 placed |= atoms
                 octahedral = not centre_rings and len(ligands) == 6 and all(len(d) == 1 for _, d in ligands)
@@ -446,6 +583,22 @@ def _layout(state, scene: _Scene) -> None:
             moved = _rigid(local_scene_pos, anchor, body, direction, (direction[0] * reach, direction[1] * reach))
             scene.pos.update(moved)
             placed |= atoms
+
+        # Wide chelates (bipyridine, phenanthroline) run into their neighbours
+        # at the usual distance: move them all out, as such complexes are drawn,
+        # until no two ligands touch.
+        for _ in range(10):
+            if not chelate_rings or not any(
+                math.dist(scene.pos[a], scene.pos[b]) < 0.85 * _BOND
+                for position, (first, _) in enumerate(ligands)
+                for second, _ in ligands[position + 1 :]
+                for a in first
+                for b in second
+            ):
+                break
+            for atoms, direction in chelate_rings:
+                for idx in atoms:
+                    scene.pos[idx] = (scene.pos[idx][0] + 0.3 * direction[0], scene.pos[idx][1] + 0.3 * direction[1])
 
     # Whatever is left stands beside the complex: free metallocenes, counter-ions, solvent.
     cursor = (max((p[0] for p in scene.pos.values()), default=0.0) + 2.5) if scene.pos else 0.0
@@ -567,6 +720,50 @@ def _settle_charges(state, scene: _Scene) -> None:
         scene.atoms[state.centre].charge = 0  # written on the bracket instead
 
 
+def _mark_stereocentres(state, scene: _Scene) -> None:
+    """Give each stereocentre a wedge or hashed bond that says, in this layout, what the input said."""
+
+    from rdkit import Chem
+    from rdkit.Chem import rdDepictor  # noqa: F401  (registers conformer support)
+    from rdkit.Geometry import Point3D
+
+    mol = Chem.Mol(state.mol)
+    conformer = Chem.Conformer(mol.GetNumAtoms())
+    for idx in range(mol.GetNumAtoms()):
+        x, y = scene.pos.get(idx, (0.0, 0.0))
+        conformer.SetAtomPosition(idx, Point3D(x, y, 0.0))
+    conf_id = mol.AddConformer(conformer, assignId=True)
+    face_bound = {idx for ring in scene.rings for idx in ring.atoms}
+    unspecified = Chem.ChiralType.CHI_UNSPECIFIED
+    for atom in mol.GetAtoms():
+        centre = atom.GetIdx()
+        if atom.GetChiralTag() == unspecified or centre not in scene.pos or centre in face_bound:
+            continue
+        drawn = [n.GetIdx() for n in atom.GetNeighbors() if frozenset((centre, n.GetIdx())) in scene.bonds]
+        if len(drawn) != atom.GetDegree() or len(drawn) < 3:
+            continue  # an abbreviation swallowed a neighbour
+
+        def preference(other: int, centre: int = centre) -> tuple:
+            # The smallest substituent carries the wedge; never a ring bond or another stereocentre.
+            neighbour = mol.GetAtomWithIdx(other)
+            return (
+                mol.GetBondBetweenAtoms(centre, other).IsInRing(),
+                neighbour.GetChiralTag() != unspecified,
+                other in face_bound,
+                len(scene.component(other, {centre})),
+                other,
+            )
+
+        chosen = min(drawn, key=preference)
+        bond = mol.GetBondBetweenAtoms(centre, chosen)
+        Chem.WedgeBond(bond, centre, mol.GetConformer(conf_id))
+        direction = bond.GetBondDir()
+        if direction == Chem.BondDir.BEGINWEDGE:
+            scene.bond_style[(centre, chosen)] = "wedge"
+        elif direction == Chem.BondDir.BEGINDASH:
+            scene.bond_style[(centre, chosen)] = "hash"
+
+
 def _labelled(scene: _Scene, idx: int) -> bool:
     atom = scene.atoms[idx]
     return atom.always_labelled or atom.symbol != "C" or atom.charge != 0 or not scene.neighbours(idx)
@@ -597,7 +794,7 @@ def _render(scene: _Scene) -> str:
     gap = _FONT * 0.62
     parts: list[str] = []
 
-    def line(a: Point, b: Point, trim_a: float, trim_b: float, width_: float = 1.6, offset: float = 0.0) -> None:
+    def line(a: Point, b: Point, trim_a: float, trim_b: float, width_: float = _LINE, offset: float = 0.0) -> None:
         length = math.dist(a, b)
         if length <= trim_a + trim_b + 0.5:
             return
@@ -612,14 +809,69 @@ def _render(scene: _Scene) -> str:
         frozenset((r.atoms[i], r.atoms[(i + 1) % len(r.atoms)])) for r in scene.rings for i in range(len(r.atoms))
     }
 
+    def tapered(a: Point, b: Point, style: str, wide: float = 4.5) -> None:
+        """A wedge or a hashed wedge, narrow at ``a``."""
+        length = math.dist(a, b)
+        if length < 1.0:
+            return
+        nx, ny = -(b[1] - a[1]) / length, (b[0] - a[0]) / length
+        if style == "wedge":
+            parts.append(
+                f'<polygon points="{a[0]:.1f},{a[1]:.1f} {b[0] + nx * wide:.1f},{b[1] + ny * wide:.1f} '
+                f'{b[0] - nx * wide:.1f},{b[1] - ny * wide:.1f}" stroke-width="0.8"/>'
+            )
+            return
+        steps = max(int(length / 4.5), 4)
+        for step in range(1, steps + 1):
+            t = step / steps
+            cx, cy, half = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.8 + (wide - 0.8) * t
+            parts.append(
+                f'<line x1="{cx + nx * half:.1f}" y1="{cy + ny * half:.1f}" '
+                f'x2="{cx - nx * half:.1f}" y2="{cy - ny * half:.1f}" stroke-width="1.3"/>'
+            )
+
+    cycle_of: dict[frozenset[int], tuple[int, ...]] = {}
+    for cycle in sorted(scene.cycles, key=len, reverse=True):
+        for position, idx in enumerate(cycle):
+            cycle_of[frozenset((idx, cycle[(position + 1) % len(cycle)]))] = cycle
+
     for pair, order in scene.bonds.items():
         if pair in ring_bonds:
             continue
-        a, b = tuple(pair)
+        a, b = sorted(pair)
+        start, end = px(scene.pos[a]), px(scene.pos[b])
         trims = [gap if _labelled(scene, idx) else 0.0 for idx in (a, b)]
-        offsets = {1: (0.0,), 2: (-2.4, 2.4), 3: (-3.6, 0.0, 3.6)}.get(order, (0.0,))
+        style = scene.bond_style.get((a, b)) or scene.bond_style.get((b, a))
+        if style and order == 1:
+            if (b, a) in scene.bond_style:
+                start, end, trims = end, start, trims[::-1]
+            length = math.dist(start, end) or 1.0
+            ux, uy = (end[0] - start[0]) / length, (end[1] - start[1]) / length
+            tapered(
+                (start[0] + ux * trims[0], start[1] + uy * trims[0]),
+                (end[0] - ux * trims[1], end[1] - uy * trims[1]),
+                style,
+            )
+            continue
+        if order == 2:
+            # Journal style: one line on the bond, the second inside the ring
+            # (or on the side of the chain's substituents) and a little shorter.
+            others = [n for idx in (a, b) for n in scene.neighbours(idx) if n not in pair]
+            inside = cycle_of.get(pair) or (
+                others if min(len(scene.neighbours(a)), len(scene.neighbours(b))) > 1 else None
+            )
+            if inside and not any(trims):
+                towards = _centroid([px(scene.pos[idx]) for idx in inside])
+                length = math.dist(start, end) or 1.0
+                normal = (-(end[1] - start[1]) / length, (end[0] - start[0]) / length)
+                middle = ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
+                sign = 1.0 if (towards[0] - middle[0]) * normal[0] + (towards[1] - middle[1]) * normal[1] >= 0 else -1.0
+                line(start, end, 0.0, 0.0)
+                line(start, end, _DOUBLE * 0.75, _DOUBLE * 0.75, offset=sign * _DOUBLE)
+                continue
+        offsets = {1: (0.0,), 2: (-_DOUBLE / 2, _DOUBLE / 2), 3: (-_DOUBLE, 0.0, _DOUBLE)}.get(order, (0.0,))
         for offset in offsets:
-            line(px(scene.pos[a]), px(scene.pos[b]), trims[0], trims[1], offset=offset)
+            line(start, end, trims[0], trims[1], offset=offset)
 
     for metal, donor in scene.links:
         start, end = px(scene.pos[metal]), px(scene.pos[donor])
@@ -627,27 +879,13 @@ def _render(scene: _Scene) -> str:
         style = scene.link_style.get((metal, donor))
         length = math.dist(start, end)
         if style is None or length <= gap * 2.4 + 2:
-            for offset in (-2.4, 2.4) if scene.link_order.get((metal, donor)) == 2 else (0.0,):
+            for offset in (-_DOUBLE / 2, _DOUBLE / 2) if scene.link_order.get((metal, donor)) == 2 else (0.0,):
                 line(start, end, gap * 1.15, gap if _labelled(scene, donor) else 0.0, offset=offset)
             continue
         ux, uy = (end[0] - start[0]) / length, (end[1] - start[1]) / length
         a = (start[0] + ux * gap * 1.15, start[1] + uy * gap * 1.15)
         b = (end[0] - ux * trim_end, end[1] - uy * trim_end)
-        nx, ny, wide = -uy, ux, 4.5
-        if style == "wedge":
-            parts.append(
-                f'<polygon points="{a[0]:.1f},{a[1]:.1f} {b[0] + nx * wide:.1f},{b[1] + ny * wide:.1f} '
-                f'{b[0] - nx * wide:.1f},{b[1] - ny * wide:.1f}" stroke-width="0.8"/>'
-            )
-        else:
-            steps = 8
-            for step in range(1, steps + 1):
-                t = step / steps
-                cx, cy, half = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, 0.8 + (wide - 0.8) * t
-                parts.append(
-                    f'<line x1="{cx + nx * half:.1f}" y1="{cy + ny * half:.1f}" '
-                    f'x2="{cx - nx * half:.1f}" y2="{cy - ny * half:.1f}" stroke-width="1.3"/>'
-                )
+        tapered(a, b, style)
 
     if scene.entity_charge and scene.entity:
         corners = [px(scene.pos[idx]) for idx in scene.entity if idx in scene.pos]
@@ -667,18 +905,36 @@ def _render(scene: _Scene) -> str:
         points = [px(scene.pos[idx]) for idx in ring.atoms]
         centre = _centroid(points)
         metal = px(scene.pos[ring.metal])
-        line(metal, centre, gap * 1.15, 0.0)
+        reach = math.dist(metal, centre)
+        if reach > gap * 1.15 + 1:
+            ux, uy = (centre[0] - metal[0]) / reach, (centre[1] - metal[1]) / reach
+            parts.append(
+                f'<line x1="{metal[0] + ux * gap * 1.15:.1f}" y1="{metal[1] + uy * gap * 1.15:.1f}" '
+                f'x2="{centre[0]:.1f}" y2="{centre[1]:.1f}" stroke-width="{_LINE}" stroke-dasharray="7 5" '
+                f'stroke-linecap="butt"/>'
+            )
         count = len(points)
+        # Corners at the front are heavy; an edge running back from one tapers.
+        half = [_RING_BOLD / 2 if ring.depth[idx] < -0.6 else _LINE / 2 for idx in ring.atoms]
         for position in range(count):
-            a, b = ring.atoms[position], ring.atoms[(position + 1) % count]
-            front = (ring.depth[a] + ring.depth[b]) / 2 < -0.3
-            line(points[position], points[(position + 1) % count], 0.0, 0.0, width_=5.0 if front else 1.6)
+            a, b = points[position], points[(position + 1) % count]
+            wide_a, wide_b = half[position], half[(position + 1) % count]
+            if max(wide_a, wide_b) <= _LINE / 2:
+                line(a, b, 0.0, 0.0)
+                continue
+            length = math.dist(a, b) or 1.0
+            nx, ny = -(b[1] - a[1]) / length, (b[0] - a[0]) / length
+            parts.append(
+                f'<polygon points="{a[0] + nx * wide_a:.1f},{a[1] + ny * wide_a:.1f} '
+                f"{b[0] + nx * wide_b:.1f},{b[1] + ny * wide_b:.1f} {b[0] - nx * wide_b:.1f},{b[1] - ny * wide_b:.1f} "
+                f'{a[0] - nx * wide_a:.1f},{a[1] - ny * wide_a:.1f}" stroke-width="{_LINE}"/>'
+            )
         axis = _normalise((centre[0] - metal[0], centre[1] - metal[1])) or (0.0, -1.0)
         tilt = math.degrees(math.atan2(axis[1], axis[0])) - 90.0
-        radius = _RING_RADIUS * _SCALE * 0.52
+        radius = _RING_RADIUS * _SCALE * 0.55
         parts.append(
             f'<ellipse cx="{centre[0]:.1f}" cy="{centre[1]:.1f}" rx="{radius:.1f}" ry="{radius * _RING_SQUASH:.1f}" '
-            f'transform="rotate({tilt:.1f} {centre[0]:.1f} {centre[1]:.1f})" fill="none" stroke-width="1.4"/>'
+            f'transform="rotate({tilt:.1f} {centre[0]:.1f} {centre[1]:.1f})" fill="none" stroke-width="{_LINE:.1f}"/>'
         )
 
     small = _FONT * 0.68
@@ -723,6 +979,7 @@ def _render(scene: _Scene) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width:.0f}" height="{height:.0f}" '
         f'viewBox="0 0 {width:.0f} {height:.0f}" stroke="currentColor" fill="currentColor" stroke-linecap="round" '
+        f'stroke-linejoin="round" '
         f'font-family="Helvetica, Arial, sans-serif" font-size="{_FONT:.0f}">'
         + "".join(parts).replace("<text ", '<text stroke="none" ')
         + "</svg>"
@@ -746,6 +1003,7 @@ def depict_complex_svg(smiles: str = "", *, molblock: str = "", rdkit_mol=None) 
         _layout(state, scene)
         _spread_leaves(scene)
         _settle_charges(state, scene)
+        _mark_stereocentres(state, scene)
         if set(scene.atoms) - set(scene.pos):
             return None
         return _render(scene)

@@ -579,7 +579,9 @@ def name_endpoint(req: NameRequest) -> dict:
     key = _cache_key("name", req.smiles, flags)
     cached = _cache_get(key)
     if cached is not None:
-        return cached
+        # Entries stored before complexes were drawn carry no picture; it is
+        # cheap to add, and a build without the drawer leaves them as they are.
+        return cached if "complex_svg" in cached else _add_complex_picture(cached, req.smiles)
     if not req.verify_opsin:
         result = name_one(
             req.smiles,
