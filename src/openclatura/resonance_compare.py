@@ -27,8 +27,14 @@ def equivalent_smiles(smiles_a: str, smiles_b: str) -> bool:
         return False
     if canonical_a == canonical_b:
         return True
-    normalized_a = _sulfur_ylide_resonance_canonical(smiles_a)
-    normalized_b = _sulfur_ylide_resonance_canonical(smiles_b)
+    normalized_a = _cyclopentadienide_resonance_canonical(smiles_a)
+    normalized_b = _cyclopentadienide_resonance_canonical(smiles_b)
+    if normalized_a is None or normalized_b is None:
+        return False
+    if normalized_a == normalized_b:
+        return True
+    normalized_a = _sulfur_ylide_resonance_canonical(normalized_a)
+    normalized_b = _sulfur_ylide_resonance_canonical(normalized_b)
     if normalized_a is None or normalized_b is None:
         return False
     normalized_a = _terminal_chalcogen_resonance_canonical(normalized_a)
@@ -79,6 +85,61 @@ def _kekule_resonance_equivalent(left: str, right: str) -> bool:
         if rendered == target:
             return True
     return False
+
+
+def _cyclopentadienide_resonance_canonical(smiles: str) -> str | None:
+    """Put the charge of each cyclopentadienide ring on a canonical ring atom.
+
+    The five carbons of an aromatic cyclopentadienide share one negative
+    charge, so a substituted ring can be drawn with the charge on any of them
+    (the metallocene parents are read back with it on locant 1).  Only an
+    isolated all-carbon five-membered aromatic ring holding exactly one
+    negative charge is touched; the hydrogens stay where they are.
+    """
+
+    from rdkit import Chem
+
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    ring_info = mol.GetRingInfo()
+    rings = []
+    for ring in ring_info.AtomRings():
+        atoms = [mol.GetAtomWithIdx(idx) for idx in ring]
+        if (
+            len(ring) == 5
+            and all(atom.GetAtomicNum() == 6 and atom.GetIsAromatic() for atom in atoms)
+            and all(ring_info.NumAtomRings(idx) == 1 for idx in ring)
+            and sorted(atom.GetFormalCharge() for atom in atoms) == [-1, 0, 0, 0, 0]
+        ):
+            rings.append(ring)
+    if not rings:
+        return canonical_smiles(smiles)
+
+    # Pin every ring hydrogen before the charge moves, then rank the atoms on a
+    # copy with the ring charge removed so the ranks do not depend on where the
+    # charge was drawn.
+    for ring in rings:
+        for idx in ring:
+            atom = mol.GetAtomWithIdx(idx)
+            hydrogens = atom.GetTotalNumHs()
+            atom.SetNoImplicit(True)
+            atom.SetNumExplicitHs(hydrogens)
+    uncharged = Chem.Mol(mol)
+    for ring in rings:
+        for idx in ring:
+            uncharged.GetAtomWithIdx(idx).SetFormalCharge(0)
+    uncharged.UpdatePropertyCache(strict=False)
+    ranks = list(Chem.CanonicalRankAtoms(uncharged, breakTies=False))
+
+    for ring in rings:
+        target = min(ring, key=lambda idx: (ranks[idx], idx))
+        for idx in ring:
+            mol.GetAtomWithIdx(idx).SetFormalCharge(-1 if idx == target else 0)
+    try:
+        return canonical_smiles(Chem.MolToSmiles(mol))
+    except Exception:
+        return None
 
 
 def _terminal_chalcogen_resonance_canonical(smiles: str) -> str | None:

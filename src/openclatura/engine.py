@@ -15,9 +15,12 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .chalcogen_roles import require_validated_chalcogens
+from .coordination import contains_transition_metal, name_complex
+from .coordination import perceive as perceive_metal_route
 from .fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from .fusion.model import FusionMode
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
+from .metallocenes import find_metallocene, name_metallocene
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import set_token_span_building
 from .namer_config import SALT_METAL_NAMES
@@ -308,11 +311,31 @@ class NamingEngine:
 
             audit_cm = nullcontext([])
 
+        verify_smiles = ""
         try:
             with audit_cm as component_audits:
-                mol, smiles = self._prepare_input(request)
-                require_validated_chalcogens(mol)
-                if need_analysis:
+                route = (
+                    perceive_metal_route(request.smiles, request.rdkit_mol)
+                    if contains_transition_metal(request.smiles, request.rdkit_mol)
+                    else None
+                )
+                if route is not None:
+                    # Every ligand is detached from the metal in ``route.smiles``;
+                    # that drawing is what the name is checked against.
+                    verify_smiles = route.smiles
+                is_complex = route is not None and route.complex is not None
+                if is_complex:
+                    result = NamingResult(
+                        name=name_complex(route.complex, self.name_smiles),
+                        smiles=request.smiles or route.smiles,
+                    )
+                else:
+                    naming_request = request if route is None else replace(request, smiles=route.smiles, rdkit_mol=None)
+                    mol, smiles = self._prepare_input(naming_request)
+                    require_validated_chalcogens(mol)
+                if is_complex:
+                    pass  # named above; a complex has no single parent hydride to analyse
+                elif need_analysis:
                     analysis = self._analyze(
                         mol,
                         smiles=smiles,
@@ -336,6 +359,8 @@ class NamingEngine:
                         name=self._name(mol, omit_redundant_locants=request.omit_redundant_locants),
                         smiles=smiles,
                     )
+                if route is not None and route.complex is None and request.smiles:
+                    result = replace(result, smiles=request.smiles)
                 if request.style != DEFAULT_STYLE:
                     result = _apply_style(result, request.style)
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
@@ -348,7 +373,7 @@ class NamingEngine:
             set_token_span_building(previous_span_building)
 
         if request.verify_opsin:
-            check = verify_with_opsin(result.name, result.smiles)
+            check = verify_with_opsin(result.name, verify_smiles or result.smiles)
             result = replace(result, opsin_check=check)
 
         if request.verify_self:
@@ -438,7 +463,10 @@ class NamingEngine:
             return ""
 
         names = []
-        for component in get_connected_components(mol):
+        metallocene, components = find_metallocene(mol, get_connected_components(mol))
+        if metallocene is not None:
+            names.append((self._name_metallocene(mol, metallocene, omit_redundant_locants), 0))
+        for component in components:
             component_name = self._name_component(
                 mol,
                 component,
@@ -481,6 +509,19 @@ class NamingEngine:
         )
 
         named_components = []
+        metallocene, components = find_metallocene(mol, components)
+        if metallocene is not None:
+            metallocene_name = self._name_metallocene(mol, metallocene, omit_redundant_locants)
+            trace_decision(
+                decisions,
+                TracePhase.COMPONENT,
+                "named metallocene",
+                "A metal dication and two cyclopentadienide rings are one metallocene parent; "
+                "ring substituents are cited as prefixes with unprimed and primed locants.",
+                atoms=set(metallocene.atoms),
+                data={"name": metallocene_name, "metal_atom": metallocene.metal},
+            )
+            named_components.append((metallocene_name, [], None, 0))
         for component in components:
             component_name, trace, tree = self._name_component(
                 mol,
@@ -530,6 +571,14 @@ class NamingEngine:
 
         charge_rank = 0 if charge > 0 else (1 if charge < 0 else 2)
         return (charge_rank, 0 if name in SALT_METAL_NAMES else 1, name)
+
+    @staticmethod
+    def _name_metallocene(mol: Molecule, metallocene: Any, omit_redundant_locants: bool) -> str:
+        from functools import partial
+
+        from .namer import name_subgraph
+
+        return name_metallocene(mol, metallocene, partial(name_subgraph, omit_redundant_locants=omit_redundant_locants))
 
     @staticmethod
     def _name_component(*args: Any, **kwargs: Any):

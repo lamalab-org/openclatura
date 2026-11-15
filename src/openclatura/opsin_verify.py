@@ -23,6 +23,7 @@ from .resonance_compare import canonical_smiles, equivalent_smiles
 
 OpsinStatus = Literal[
     "matched",
+    "matched_composition",
     "mismatched",
     "name_unparseable",
     "name_empty",
@@ -128,6 +129,31 @@ def _opsin_error_message(exc: BaseException) -> str:
     return "\n".join(messages)
 
 
+def _coordination_composition_check(name: str, smiles: str, canonical_original: str | None) -> OpsinCheck | None:
+    """Check a coordination name OPSIN cannot read whole, by metal, ligands and counts.
+
+    The name is split into ligands and central atom; OPSIN reads the organic
+    ligand names.  A match is reported as ``matched_composition`` because it
+    says nothing about which atoms bind the metal.
+    """
+
+    from .coordination_names import composition_equivalent, parse_coordination_compound
+
+    try:
+        parsed = parse_coordination_compound(name)
+    except Exception:
+        return None
+    if parsed is None:
+        return None
+    return OpsinCheck(
+        status="matched_composition" if composition_equivalent(parsed, smiles) else "mismatched",
+        name=name,
+        canonical_original=canonical_original,
+        opsin_smiles=parsed,
+        canonical_roundtrip=_canonicalize(parsed),
+    )
+
+
 def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -> OpsinCheck:
     """Round-trip ``name`` through OPSIN and compare to ``smiles``.
 
@@ -168,6 +194,9 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
         )
 
     if not decoded or not decoded[0]:
+        composition = _coordination_composition_check(name, smiles, canonical_original)
+        if composition is not None:
+            return composition
         return OpsinCheck(
             status="name_unparseable",
             name=name,
@@ -197,6 +226,12 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
             opsin_smiles=opsin_smiles,
             canonical_roundtrip=canonical_roundtrip,
         )
+
+    # OPSIN reads a few simple coordination names, but as covalently bonded
+    # structures; the ligand-by-ligand reading is the one to compare.
+    composition = _coordination_composition_check(name, smiles, canonical_original)
+    if composition is not None and composition.status == "matched_composition":
+        return composition
 
     return OpsinCheck(
         status="mismatched",

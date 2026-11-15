@@ -25,17 +25,21 @@ from __future__ import annotations
 from typing import Any
 
 try:
-    from fastapi import FastAPI
+    from fastapi import FastAPI, HTTPException
     from pydantic import BaseModel, Field
 except ImportError as exc:  # pragma: no cover - extra not installed
     raise ImportError("openclatura.web requires the [web] extra: pip install 'openclatura[web]'") from exc
 
-from .. import __version__, describe, name_many
+from .. import __version__, describe, name_many, name_molblock
 from .. import name as name_one
 
 
 class NameRequest(BaseModel):
-    smiles: str = Field(..., description="A single SMILES string")
+    smiles: str | None = Field(None, description="A single SMILES string")
+    molblock: str | None = Field(
+        None,
+        description="A molfile instead of SMILES; keeps dative and haptic bonds to a metal",
+    )
     include_trace: bool = Field(False, description="Include trace_segments in response")
     verify_opsin: bool = Field(False, description="Round-trip the generated name via OPSIN")
     token_debug: bool = Field(False, description="Include verbose emitted token metadata in decisions")
@@ -69,12 +73,20 @@ def create_app() -> FastAPI:
 
     @app.post("/name")
     def name_endpoint(req: NameRequest) -> dict[str, Any]:
-        result = name_one(
-            req.smiles,
-            include_trace=req.include_trace,
-            verify_opsin=req.verify_opsin,
-            token_debug=req.token_debug,
-        )
+        if (req.smiles is None) == (req.molblock is None):
+            raise HTTPException(status_code=422, detail="give exactly one of 'smiles' or 'molblock'")
+        options = {
+            "include_trace": req.include_trace,
+            "verify_opsin": req.verify_opsin,
+            "token_debug": req.token_debug,
+        }
+        if req.molblock is not None:
+            try:
+                result = name_molblock(req.molblock, **options)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        else:
+            result = name_one(req.smiles, **options)
         return result.to_dict(include_trace=req.include_trace)
 
     @app.post("/batch")

@@ -21,7 +21,7 @@ import sys
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
-from . import __version__, name_many
+from . import __version__, name_many, name_molblock
 from . import describe as describe_one
 from . import name as name_one
 from .naming_style import PRESETS, NamingStyle, resolve_style
@@ -60,7 +60,25 @@ def _add_style_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _cmd_name(args: argparse.Namespace) -> int:
-    result = name_one(
+    if (args.smiles is None) == (args.molfile is None):
+        print("error: give either a SMILES or --molfile PATH", file=sys.stderr)
+        return 2
+    if args.molfile is not None:
+        result = name_molblock(
+            Path(args.molfile).read_text(encoding="utf-8"),
+            include_trace=args.json or args.trace,
+            verify_opsin=args.verify,
+            verify_self=args.self_audit,
+            token_debug=args.token_debug,
+            style=_style_from_args(args),
+        )
+    else:
+        result = _name_smiles_arg(args)
+    return _report_name_result(args, result)
+
+
+def _name_smiles_arg(args: argparse.Namespace):
+    return name_one(
         args.smiles,
         include_trace=args.json or args.trace,
         verify_opsin=args.verify,
@@ -68,6 +86,9 @@ def _cmd_name(args: argparse.Namespace) -> int:
         token_debug=args.token_debug,
         style=_style_from_args(args),
     )
+
+
+def _report_name_result(args: argparse.Namespace, result) -> int:
     if args.json:
         json.dump(result.to_dict(include_trace=True), sys.stdout, indent=2, default=str)
         sys.stdout.write("\n")
@@ -130,7 +151,12 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_name = sub.add_parser("name", help="Name a single SMILES")
-    p_name.add_argument("smiles")
+    p_name.add_argument("smiles", nargs="?")
+    p_name.add_argument(
+        "--molfile",
+        metavar="PATH",
+        help="name a molfile instead of a SMILES (keeps dative and haptic bonds to a metal)",
+    )
     p_name.add_argument("--trace", action="store_true", help="also print rule hints to stderr")
     p_name.add_argument("--json", action="store_true", help="emit JSON to stdout")
     p_name.add_argument(

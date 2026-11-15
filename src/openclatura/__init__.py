@@ -87,6 +87,19 @@ def name(
     )
 
 
+def name_molblock(molblock: str, **options) -> NamingResult:
+    """One-shot naming of a molfile (V2000 or V3000). Returns a ``NamingResult``.
+
+    A molfile can say what SMILES cannot: which ligand atoms bind a metal
+    (dative bonds) and that a whole ring binds it (haptic bonds).  Takes the
+    same keyword options as :func:`name_mol`.
+    """
+
+    from .coordination import read_molblock
+
+    return name_mol(read_molblock(molblock), **options)
+
+
 def name_mol(
     rdkit_mol,
     *,
@@ -207,6 +220,7 @@ __all__ = [
     "name",
     "name_many",
     "name_mol",
+    "name_molblock",
     "name_rdkit_mol",
     "name_rdkit_mol_with_trace",
     "name_smiles",
