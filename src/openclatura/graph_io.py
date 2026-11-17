@@ -208,6 +208,10 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
         in_small_ring = any(bond.IsInRingSize(i) for i in range(3, 8))
 
         u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if stereo is not None:
+            accurate = modern_bond_cip.get((min(u, v), max(u, v)))
+            if accurate in {"E", "Z"}:
+                stereo = accurate
         mol.add_bond(
             u=u,
             v=v,
