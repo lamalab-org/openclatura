@@ -293,13 +293,25 @@ def plan_bridged_fusion_wrapper(
     bridge_segments = _junction_path_interiors(mol, atoms, topology.internal_degrees)
     if not bridge_segments:
         return None
-    visited_states = 0
+    # A segment that _bridge_operations rejects for every parent, locant map
+    # and orientation (a benzo arc, for instance) is never a bridge, so no
+    # removal containing it can yield a candidate. Searching only the other
+    # removals avoids a parent search per subset of such segments, which is
+    # exponential in their number. search_states still counts every removal
+    # of the full search, from its position in the full order.
+    never_bridges = frozenset(
+        index for index, segment in enumerate(bridge_segments) if _segment_never_bridges(mol, atoms, segment)
+    )
+    if len(never_bridges) == len(bridge_segments):
+        return None
+    positions = _RemovalStatePositions(bridge_segments, maximum_bridge_atoms)
+    pass_offset = 0
     for parent_kind in (WrapperParentKind.RETAINED, WrapperParentKind.SYSTEMATIC_FUSION):
         candidates: list[tuple[tuple, BridgedFusionWrapperPlan]] = []
-        candidate_groups = _bridge_removal_candidate_groups(bridge_segments, maximum_bridge_atoms)
+        candidate_groups = _bridge_removal_candidate_groups(bridge_segments, maximum_bridge_atoms, never_bridges)
         for count, removed_candidates in candidate_groups:
             for removed in removed_candidates:
-                visited_states += 1
+                visited_states = pass_offset + positions.position(removed)
                 parent_atoms = atoms - removed
                 parent = (
                     _retained_wrapper_parent(mol, parent_atoms)
@@ -420,6 +432,7 @@ def plan_bridged_fusion_wrapper(
                     )
                 ),
             )
+        pass_offset += positions.total
     return None
 
 
@@ -491,11 +504,18 @@ def _saturated_bridge_precursor(bridge: NondetachableBridgeOperation) -> Nondeta
 def _bridge_removal_candidate_groups(
     bridge_segments: tuple[frozenset[int], ...],
     maximum_bridge_atoms: int | None,
+    excluded: frozenset[int] = frozenset(),
 ):
-    """Yield path unions lazily in preferred removed-atom-count order."""
+    """Yield path unions lazily in preferred removed-atom-count order.
+
+    Unions containing a segment whose index is in ``excluded`` are left out;
+    the others come in the same order as without the exclusion.
+    """
 
     heap = []
     for index, segment in enumerate(bridge_segments):
+        if index in excluded:
+            continue
         if maximum_bridge_atoms is None or len(segment) <= maximum_bridge_atoms:
             heappush(heap, (len(segment), (index,), segment))
 
@@ -509,6 +529,8 @@ def _bridge_removal_candidate_groups(
         atom_count = size
         same_size.add(removed)
         for index in range(selected[-1] + 1, len(bridge_segments)):
+            if index in excluded:
+                continue
             expanded = removed | bridge_segments[index]
             if maximum_bridge_atoms is not None and len(expanded) > maximum_bridge_atoms:
                 continue
@@ -545,6 +567,86 @@ def _junction_path_interiors(
             if path and current != junction:
                 interiors.add(frozenset(path))
     return tuple(sorted(interiors, key=lambda path: (len(path), tuple(sorted(path)))))
+
+
+def _segment_never_bridges(mol: Molecule, atoms: frozenset[int], segment: frozenset[int]) -> bool:
+    """Whether _bridge_operations rejects this junction path for every removal containing it.
+
+    A segment's atoms have no neighbours in ``atoms`` but each other and the
+    two junctions at its ends, which are never removed, so its path, its
+    endpoints and the tests below are the same whatever else is removed and
+    whichever parent and locant map are tried. It is rejected when its
+    endpoints are bonded, when an end bond is not single, or when neither
+    orientation has a bridge class. False means only "not shown here".
+    """
+
+    ends = sorted(atom for atom in segment if sum(neighbor in segment for neighbor in mol.get_neighbors(atom)) <= 1)
+    if not ends:
+        return False
+    path = _walk_path(mol, set(segment), ends[0])
+    if set(path) != segment:
+        return False
+
+    def junctions(atom: int) -> list[int]:
+        return [neighbor for neighbor in mol.get_neighbors(atom) if neighbor in atoms and neighbor not in segment]
+
+    if len(path) == 1:
+        endpoints = junctions(path[0])
+        if len(endpoints) != 2:
+            return False
+    else:
+        first, last = junctions(path[0]), junctions(path[-1])
+        if len(first) != 1 or len(last) != 1:
+            return False
+        endpoints = [first[0], last[0]]
+    if mol.get_bond(*endpoints) is not None:
+        return True
+    if mol.get_bond(path[0], endpoints[0]).order != 1 or mol.get_bond(path[-1], endpoints[1]).order != 1:
+        return True
+    return _bridge_class(mol, path) is None and _bridge_class(mol, tuple(reversed(path))) is None
+
+
+class _RemovalStatePositions:
+    """Positions of segment unions in the full _bridge_removal_candidate_groups order.
+
+    The full search visits every union of at most ``maximum_bridge_atoms``
+    atoms, by atom count and then by sorted atoms. The segments are disjoint,
+    so of two unions with the same atom count, T comes first exactly when the
+    lowest atom of T ^ S is in T, and both counts are subset sums over the
+    segment sizes. This gives a union's 1-based position, and the number of
+    unions, without enumerating them.
+    """
+
+    def __init__(self, bridge_segments: tuple[frozenset[int], ...], maximum_bridge_atoms: int | None) -> None:
+        order = sorted((min(segment), len(segment)) for segment in bridge_segments)
+        self._lowest_atoms = [lowest for lowest, _ in order]
+        self._sizes = [size for _, size in order]
+        all_atoms = sum(self._sizes)
+        limit = all_atoms if maximum_bridge_atoms is None else min(maximum_bridge_atoms, all_atoms)
+        # suffix[j][s]: unions of segments j.. (the empty one too) with s atoms.
+        count = len(self._sizes)
+        suffix = [[0] * (limit + 1) for _ in range(count + 1)]
+        suffix[count][0] = 1
+        for j in range(count - 1, -1, -1):
+            size = self._sizes[j]
+            for s in range(limit + 1):
+                suffix[j][s] = suffix[j + 1][s] + (suffix[j + 1][s - size] if s >= size else 0)
+        self._suffix = suffix
+        self.total = sum(suffix[0][1:])
+
+    def position(self, removed: frozenset[int]) -> int:
+        atoms = len(removed)
+        before = 1 + sum(self._suffix[0][1:atoms])
+        taken = 0  # atoms of ``removed`` in the segments already passed
+        for j, (lowest, size) in enumerate(zip(self._lowest_atoms, self._sizes)):
+            if lowest in removed:
+                taken += size
+                continue
+            # Unions that agree with ``removed`` before segment j and take it.
+            rest = atoms - taken - size
+            if rest >= 0:
+                before += self._suffix[j + 1][rest]
+        return before
 
 
 def _oxo_wrapper_hydrogen_state(mol: Molecule, match: RetainedGraphTemplateMatch) -> RetainedGraphTemplateMatch:

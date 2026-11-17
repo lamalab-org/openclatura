@@ -227,51 +227,76 @@ def iter_fusion_name_asts(
             parent_scopes[component_variant_identity(spec)].add(option.atom_ids)
     parent_scopes = {variant: scopes for variant, scopes in parent_scopes.items() if len(scopes) > 1}
 
-    selections_by_preference: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
-    for selection in selections:
-        prepared = _prepare_component_selection(
-            mol,
-            selection,
-            registry,
-            supported_covers=supported_covers,
-            supported_joins=supported_joins,
-            parent_scopes=parent_scopes,
-            target_atom_ids=target_atoms,
-            target_edges=target_edges,
+    def selections_by_preference(selection_indices: Iterable[int], *, skip_non_tree: bool):
+        tiers: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
+        for index in selection_indices:
+            if skip_non_tree and not _may_be_tree_cover(selections[index], option_edges):
+                continue
+            prepared = _prepare_component_selection(
+                mol,
+                selections[index],
+                registry,
+                supported_covers=supported_covers,
+                supported_joins=supported_joins,
+                parent_scopes=parent_scopes,
+                target_atom_ids=target_atoms,
+                target_edges=target_edges,
+            )
+            if prepared is None:
+                continue
+            for preference in _selection_preference_tiers(
+                prepared,
+                allow_multiparent_parents=allow_multiparent_parents,
+                enforce_interoperability_limits=enforce_interoperability_limits,
+            ):
+                tiers[preference].append(prepared)
+        return tiers
+
+    # Tiers come in (parent seniority, location) order, and callers usually
+    # stop in the first, so covers are prepared (and cover-audited) one parent
+    # seniority at a time rather than all before the first tier. Every tier of
+    # a cover carries the same seniority, the best among its parent-eligible
+    # components (see _selection_preference_tiers), and a cover with no
+    # eligible component has no tier; so bucketing the covers by that seniority
+    # and keeping their order within a bucket gives the same tiers, in the same
+    # order, with the same covers in each. Preparing a cover raises only from
+    # _scope_for_match; if that can happen for any cover, every cover is
+    # prepared up front as before, so the same error comes first.
+    option_edges = _option_scope_edges(mol, options, registry)
+    buckets = _covers_by_parent_seniority(selections, registry, option_edges)
+    if buckets is None:
+        stages = iter((selections_by_preference(range(len(selections)), skip_non_tree=False),))
+    else:
+        skip_non_tree = "multiparent" not in supported_covers
+        stages = (
+            selections_by_preference(buckets[seniority], skip_non_tree=skip_non_tree) for seniority in sorted(buckets)
         )
-        if prepared is None:
-            continue
-        for preference in _selection_preference_tiers(
-            prepared,
-            allow_multiparent_parents=allow_multiparent_parents,
-            enforce_interoperability_limits=enforce_interoperability_limits,
-        ):
-            selections_by_preference[preference].append(prepared)
 
     emitted: list[FusionNameAst] = []
-    for preference in sorted(selections_by_preference):
-        candidates: list[_Candidate] = []
-        parent_seniority, _location_prefix = preference
-        for prepared in selections_by_preference[preference]:
-            candidates.extend(
-                _candidates_for_component_selection(
-                    mol,
-                    prepared,
-                    registry,
-                    supported_joins=supported_joins,
-                    allow_multiparent_parents=allow_multiparent_parents,
-                    enforce_interoperability_limits=enforce_interoperability_limits,
-                    required_parent_seniority=parent_seniority,
+    for stage in stages:
+        for preference in sorted(stage):
+            candidates: list[_Candidate] = []
+            parent_seniority, _location_prefix = preference
+            for prepared in stage[preference]:
+                candidates.extend(
+                    _candidates_for_component_selection(
+                        mol,
+                        prepared,
+                        registry,
+                        supported_joins=supported_joins,
+                        allow_multiparent_parents=allow_multiparent_parents,
+                        enforce_interoperability_limits=enforce_interoperability_limits,
+                        required_parent_seniority=parent_seniority,
+                    )
                 )
-            )
-        # The rendered name orders candidates that every structural criterion
-        # leaves tied, so it is only needed within a tie. Ranking the whole set
-        # by it meant rendering thousands of citations per system when the
-        # caller stops at the first one that passes its audit.
-        for ast in _candidates_in_citation_order(candidates, registry):
-            if ast not in emitted:
-                emitted.append(ast)
-                yield ast
+            # The rendered name orders candidates that every structural criterion
+            # leaves tied, so it is only needed within a tie. Ranking the whole set
+            # by it meant rendering thousands of citations per system when the
+            # caller stops at the first one that passes its audit.
+            for ast in _candidates_in_citation_order(candidates, registry):
+                if ast not in emitted:
+                    emitted.append(ast)
+                    yield ast
     if not emitted:
         tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
         raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
@@ -370,6 +395,75 @@ def _prepare_component_selection(
             if atom_scopes - selected_scopes.get(variant, set())
         )
     return _PreparedComponentSelection(ordered, matches, specs, audit.graph, audit.proof.kind, hidden)
+
+
+def _option_scope_edges(
+    mol: Molecule,
+    options: Sequence[_OccurrenceOption],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+) -> dict[int, frozenset[tuple[int, int]] | None]:
+    """Map ``id(option)`` to the edges _prepare_component_selection scopes it to, or None if scoping raises.
+
+    The scope of a match does not depend on its occurrence id, so this is the
+    scope every cover containing the option gets.
+    """
+
+    edges: dict[int, frozenset[tuple[int, int]] | None] = {}
+    for option in options:
+        match = option.mappings[0]
+        try:
+            edges[id(option)] = _scope_for_match(mol, match, _spec_for_match(registry, match)).edges
+        except Exception:
+            edges[id(option)] = None
+    return edges
+
+
+def _covers_by_parent_seniority(
+    selections: Sequence[Sequence[_OccurrenceOption]],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    option_edges: Mapping[int, frozenset[tuple[int, int]] | None],
+) -> dict[tuple, list[int]] | None:
+    """Group cover indices by the parent seniority all of their tiers carry.
+
+    That seniority is the best among the cover's parent-eligible components,
+    which _selection_preference_tiers finds the same way; eligibility looks at
+    faces and atom maps, not occurrence ids, so it needs no prepared cover.
+    Covers with no eligible component, which have no tier, are left out.
+    Returns None when scoping any option of a cover raises.
+    """
+
+    if any(option_edges[id(option)] is None for selection in selections for option in selection):
+        return None
+    buckets: dict[tuple, list[int]] = defaultdict(list)
+    for index, selection in enumerate(selections):
+        matches = tuple(option.mappings[0] for option in selection)
+        seniorities = [
+            component_spec_seniority_key(spec).as_tuple()
+            for match in matches
+            if component_parent_eligible(match, spec := _spec_for_match(registry, match), matches)
+        ]
+        if seniorities:
+            buckets[min(seniorities)].append(index)
+    return buckets
+
+
+def _may_be_tree_cover(
+    selection: Sequence[_OccurrenceOption],
+    option_edges: Mapping[int, frozenset[tuple[int, int]] | None],
+) -> bool:
+    """Whether a cover's overlap graph can be a tree, from the bonds its components share.
+
+    Components are linked when they share a bond, and a tree of k components
+    has exactly k - 1 links. With fewer the graph is disconnected, and with
+    more it is disconnected or cyclic, so audit_component_cover does not prove
+    a tree cover.
+    """
+
+    if len(selection) < 2:
+        return True
+    scopes = [option_edges[id(option)] for option in selection]
+    links = sum(1 for left, right in combinations(scopes, 2) if not left.isdisjoint(right))
+    return links == len(selection) - 1
 
 
 def render_fusion_name(

@@ -21,7 +21,7 @@ def test_bridge_wrapper_proves_completed_system_unsaturation_without_more_search
     with patch.object(wrappers, "_systematic_fusion_parent", wraps=wrappers._systematic_fusion_parent) as planner:
         plan = wrappers.plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL)
 
-    assert planner.call_count == 6
+    assert planner.call_count == 3
     assert plan is not None and plan.rendered_name == EXPECTED
     assert plan.search_states == 69
     assert plan.parent.name == "dicyclopenta[c,g]phenanthrene"

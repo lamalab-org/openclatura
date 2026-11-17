@@ -145,7 +145,7 @@ def test_deeply_ambiguous_system_prunes_incomplete_parents_before_candidate_audi
     monkeypatch.setattr(planner, "_plan_numbered_candidate", counting)
 
     assert name_smiles(smiles)
-    assert attempted == 4
+    assert attempted == 0
 
 
 def test_external_pi_candidates_are_proved_lazily_in_rank_order():
